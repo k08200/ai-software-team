@@ -1,9 +1,11 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
 import pipelineRouter from "./routes/pipeline.js";
+import { scheduleCleanup } from "./utils/cleanup.js";
 
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
@@ -22,6 +24,25 @@ if (!fs.existsSync(outputsDir)) {
   fs.mkdirSync(outputsDir, { recursive: true });
 }
 
+// Rate limiting: max 5 pipeline runs per IP per 15 minutes
+const pipelineLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Maximum 5 pipeline runs per 15 minutes." },
+  skip: (req) => req.method !== "POST", // Only rate-limit POST /run
+});
+
+// General API rate limit: 100 requests per minute
+const generalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please slow down." },
+});
+
 // Middleware
 app.use(cors({
   origin: CLIENT_ORIGIN,
@@ -30,6 +51,8 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: "10kb" }));
+app.use("/api/pipeline", generalLimiter);
+app.use("/api/pipeline/run", pipelineLimiter);
 
 // Routes
 app.use("/api/pipeline", pipelineRouter);
@@ -54,6 +77,10 @@ const server = app.listen(PORT, () => {
   console.log(`AI Software Team server running on http://localhost:${PORT}`);
   console.log(`Model: ${process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6"}`);
   console.log(`Max rounds: ${process.env.MAX_ROUNDS ?? "3"}`);
+  console.log(`Rate limit: 5 pipeline runs per 15 minutes per IP`);
+
+  // Schedule periodic cleanup of old output files (runs every hour)
+  scheduleCleanup();
 });
 
 // Graceful shutdown

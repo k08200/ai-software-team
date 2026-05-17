@@ -1,8 +1,59 @@
 /**
- * Extracts issues from agent output text using pattern matching.
- * Looks for numbered lists and bullet points in issue-related sections.
+ * Extracts issues from agent output.
+ * Agents now output structured JSON — parse that first, fall back to regex.
  */
-export function extractIssues(content: string): string[] {
+
+interface StructuredIssue {
+  id: string;
+  severity: string;
+  description: string;
+}
+
+interface QAOutput {
+  issues?: StructuredIssue[];
+  totalIssues?: number;
+}
+
+interface SecurityOutput {
+  issues?: StructuredIssue[];
+  totalIssues?: number;
+}
+
+interface ReviewOutput {
+  issues?: StructuredIssue[];
+  totalIssues?: number;
+}
+
+function parseJSON<T>(content: string): T | null {
+  // Try to extract JSON from the content (handle markdown code blocks)
+  const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ??
+                    content.match(/({[\s\S]*})/);
+
+  const raw = jsonMatch ? jsonMatch[1] : content.trim();
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function issueToString(issue: StructuredIssue): string {
+  return `[${issue.severity?.toUpperCase() ?? "UNKNOWN"}] ${issue.description}`;
+}
+
+function extractFromStructured(content: string): string[] {
+  const parsed = parseJSON<QAOutput | SecurityOutput | ReviewOutput>(content);
+  if (!parsed) return [];
+
+  const issues = parsed.issues ?? [];
+  return issues.map(issueToString).filter((s) => s.length > 10);
+}
+
+/**
+ * Legacy regex-based extraction (fallback for non-JSON outputs).
+ */
+function extractFromMarkdown(content: string): string[] {
   const issues: string[] = [];
   const seen = new Set<string>();
 
@@ -14,71 +65,44 @@ export function extractIssues(content: string): string[] {
     }
   }
 
-  // Strategy 1: Find content in issue/bug sections (any heading depth)
-  // Matches: "## ISSUES:", "### ISSUES:", "ISSUES:", etc.
   const sectionRegex = /(?:^|\n)#{0,6}\s*(?:ISSUES?|BUGS?|VULNERABILIT(?:Y|IES)|PROBLEMS?|FINDINGS?)\s*:?\s*\n([\s\S]*?)(?=\n#{1,6}\s|\n\n\n|$)/gi;
-
   let sectionMatch: RegExpExecArray | null;
   while ((sectionMatch = sectionRegex.exec(content)) !== null) {
     const section = sectionMatch[1];
-    const lines = section.split("\n");
-    for (const line of lines) {
-      const stripped = line.trim();
-      // Match: "1. text", "- text", "* text", "• text"
-      const itemMatch = stripped.match(/^(?:\d+[.)]\s+|[-*•]\s+)(.{10,})/);
-      if (itemMatch) {
-        addIssue(itemMatch[1]);
-      }
+    for (const line of section.split("\n")) {
+      const m = line.trim().match(/^(?:\d+[.)]\s+|[-*•]\s+)(.{10,})/);
+      if (m) addIssue(m[1]);
     }
   }
 
-  // Strategy 2: Scan entire document for numbered/bulleted items near issue keywords
-  const lines = content.split("\n");
-  let inIssueSection = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineLower = line.toLowerCase();
-
-    // Track if we're in an issue-related section
-    if (/^#{0,6}\s*(?:issues?|bugs?|vulnerabilit|problems?|findings?)/i.test(line)) {
-      inIssueSection = true;
-      continue;
-    }
-
-    // Exit issue section on new heading
-    if (/^#{1,6}\s+\w/.test(line) && !/(?:issues?|bugs?|vulnerabilit)/i.test(lineLower)) {
-      inIssueSection = false;
-    }
-
-    if (inIssueSection) {
-      const stripped = line.trim();
-      const itemMatch = stripped.match(/^(?:\d+[.)]\s+|[-*•]\s+)(.{10,})/);
-      if (itemMatch) {
-        addIssue(itemMatch[1]);
-      }
-    }
-  }
-
-  // Strategy 3: [TAG] markers anywhere in the document
   const markerRegex = /\[(?:BUG|ISSUE|VULN|CRITICAL|HIGH|MEDIUM|LOW)\][:\s]+([^\n]+)/gi;
-  let markerMatch: RegExpExecArray | null;
-  while ((markerMatch = markerRegex.exec(content)) !== null) {
-    addIssue(markerMatch[1]);
-  }
+  let m: RegExpExecArray | null;
+  while ((m = markerRegex.exec(content)) !== null) addIssue(m[1]);
 
-  // Strategy 4: Fallback - parse "N issues found" count
   if (issues.length === 0) {
     const countMatch = content.match(/(\d+)\s+(?:issues?|bugs?|vulnerabilit(?:y|ies))\s+(?:found|identified|detected)/i);
     if (countMatch) {
       const count = Math.min(parseInt(countMatch[1], 10), 20);
-      for (let i = 1; i <= count; i++) {
-        issues.push(`Issue #${i} (see report for details)`);
-      }
+      for (let i = 1; i <= count; i++) issues.push(`Issue #${i}`);
     }
   }
 
   return issues;
+}
+
+export function extractIssues(content: string): string[] {
+  // Try structured JSON first
+  const structured = extractFromStructured(content);
+  if (structured.length > 0) return structured;
+
+  // Check for explicit "0 issues" in JSON
+  const parsed = parseJSON<{ totalIssues?: number; issues?: unknown[] }>(content);
+  if (parsed && (parsed.totalIssues === 0 || (Array.isArray(parsed.issues) && parsed.issues.length === 0))) {
+    return [];
+  }
+
+  // Fallback to regex
+  return extractFromMarkdown(content);
 }
 
 export function countIssues(

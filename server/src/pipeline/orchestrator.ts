@@ -11,11 +11,13 @@ import { FrontendAgent } from "../agents/frontend-agent.js";
 import { QAAgent } from "../agents/qa-agent.js";
 import { SecurityAgent } from "../agents/security-agent.js";
 import { ReviewAgent } from "../agents/review-agent.js";
+import { BackendFixAgent, FrontendFixAgent } from "../agents/fix-agent.js";
 import { TokenTracker } from "../utils/token-tracker.js";
 import { FileManager } from "../utils/file-manager.js";
 import { countIssues } from "../utils/issue-extractor.js";
 import { estimateCost } from "../utils/cost-estimator.js";
 import { saveSession } from "../utils/session-store.js";
+import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = parseInt(process.env.MAX_ROUNDS ?? "3", 10);
 const MIN_ROUNDS = parseInt(process.env.MIN_ROUNDS ?? "3", 10);
@@ -28,6 +30,8 @@ export class PipelineOrchestrator {
   private qaAgent = new QAAgent();
   private securityAgent = new SecurityAgent();
   private reviewAgent = new ReviewAgent();
+  private backendFixAgent = new BackendFixAgent();
+  private frontendFixAgent = new FrontendFixAgent();
   private tokenTracker = new TokenTracker();
 
   async run(
@@ -46,7 +50,7 @@ export class PipelineOrchestrator {
       startTime: Date.now(),
     };
 
-    // Emit cost estimate upfront so user knows what to expect
+    // Emit cost estimate upfront
     const costEstimate = estimateCost(
       process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6",
       MAX_ROUNDS,
@@ -56,7 +60,6 @@ export class PipelineOrchestrator {
       data: { projectIdea, sessionId, costEstimate },
     });
 
-    // Save session as running
     await saveSession({
       sessionId,
       projectIdea,
@@ -68,41 +71,33 @@ export class PipelineOrchestrator {
     });
 
     try {
-      // Phase 1: CTO Agent
+      // ─── Phase 1: CTO ────────────────────────────────────────────
       ctx.architecture = await this.runAgent(
-        "cto",
-        "CTO Agent",
+        "cto", "CTO Agent",
         this.ctoAgent.buildPrompt(projectIdea),
         emit,
-        (output) => fileManager.saveAgentOutput(output),
+        (o) => fileManager.saveAgentOutput(o),
       );
 
-      // Phase 2: PM Agent
+      // ─── Phase 2: PM ─────────────────────────────────────────────
       ctx.prd = await this.runAgent(
-        "pm",
-        "PM Agent",
+        "pm", "PM Agent",
         this.pmAgent.buildPrompt(projectIdea, ctx.architecture),
         emit,
-        (output) => fileManager.saveAgentOutput(output),
+        (o) => fileManager.saveAgentOutput(o),
       );
 
-      // Phase 3: Backend Agent
+      // ─── Phase 3: Backend ─────────────────────────────────────────
       ctx.backendCode = await this.runAgent(
-        "backend",
-        "Backend Agent",
-        this.backendAgent.buildPrompt(
-          projectIdea,
-          ctx.architecture,
-          ctx.prd,
-        ),
+        "backend", "Backend Agent",
+        this.backendAgent.buildPrompt(projectIdea, ctx.architecture, ctx.prd),
         emit,
-        (output) => fileManager.saveAgentOutput(output),
+        (o) => fileManager.saveAgentOutput(o),
       );
 
-      // Phase 4: Frontend Agent
+      // ─── Phase 4: Frontend ────────────────────────────────────────
       ctx.frontendCode = await this.runAgent(
-        "frontend",
-        "Frontend Agent",
+        "frontend", "Frontend Agent",
         this.frontendAgent.buildPrompt(
           projectIdea,
           ctx.architecture,
@@ -110,14 +105,12 @@ export class PipelineOrchestrator {
           ctx.backendCode,
         ),
         emit,
-        (output) => fileManager.saveAgentOutput(output),
+        (o) => fileManager.saveAgentOutput(o),
       );
 
-      // Phase 5: Iteration loop (QA + Security + Review)
+      // ─── Phase 5: Iteration loop ──────────────────────────────────
       let round = 0;
       let totalIssues = Infinity;
-      let previousQAIssues = "";
-      let previousSecurityIssues = "";
 
       while (
         (round < MIN_ROUNDS || totalIssues > 0) &&
@@ -126,49 +119,53 @@ export class PipelineOrchestrator {
         round++;
         emit({ type: "round_start", data: { round } });
 
-        const qaOutput = await this.runAgentWithOutput(
-          "qa",
-          "QA Agent",
-          this.qaAgent.buildPrompt(
-            projectIdea,
-            ctx.prd,
-            ctx.backendCode,
-            ctx.frontendCode,
+        // QA and Security run IN PARALLEL (they're independent)
+        const prevRound = ctx.rounds[round - 2];
+        const [qaOutput, securityOutput] = await Promise.all([
+          this.runAgentWithOutput(
+            "qa", "QA Agent",
+            this.qaAgent.buildPrompt(
+              projectIdea,
+              ctx.prd ?? "",
+              ctx.backendCode ?? "",
+              ctx.frontendCode ?? "",
+              round,
+              prevRound?.qaOutput.content,
+            ),
+            emit,
+            (o) => fileManager.saveAgentOutput({ ...o, agentId: "qa" as const }),
             round,
-            previousQAIssues,
           ),
-          emit,
-          (output) => fileManager.saveAgentOutput({ ...output, agentId: "qa" as const }),
-        );
-
-        const securityOutput = await this.runAgentWithOutput(
-          "security",
-          "Security Agent",
-          this.securityAgent.buildPrompt(
-            projectIdea,
-            ctx.backendCode,
-            ctx.frontendCode,
+          this.runAgentWithOutput(
+            "security", "Security Agent",
+            this.securityAgent.buildPrompt(
+              projectIdea,
+              ctx.backendCode ?? "",
+              ctx.frontendCode ?? "",
+              round,
+              prevRound?.securityOutput.content,
+            ),
+            emit,
+            (o) => fileManager.saveAgentOutput({ ...o, agentId: "security" as const }),
             round,
-            previousSecurityIssues,
           ),
-          emit,
-          (output) => fileManager.saveAgentOutput({ ...output, agentId: "security" as const }),
-        );
+        ]);
 
+        // Review runs after QA + Security (needs their output as context)
         const reviewOutput = await this.runAgentWithOutput(
-          "review",
-          "Review Agent",
+          "review", "Review Agent",
           this.reviewAgent.buildPrompt(
             projectIdea,
-            ctx.architecture,
-            ctx.backendCode,
-            ctx.frontendCode,
+            ctx.architecture ?? "",
+            ctx.backendCode ?? "",
+            ctx.frontendCode ?? "",
             round,
             qaOutput.content,
             securityOutput.content,
           ),
           emit,
-          (output) => fileManager.saveAgentOutput({ ...output, agentId: "review" as const }),
+          (o) => fileManager.saveAgentOutput({ ...o, agentId: "review" as const }),
+          round,
         );
 
         const issues = countIssues(
@@ -176,10 +173,7 @@ export class PipelineOrchestrator {
           securityOutput.content,
           reviewOutput.content,
         );
-
         totalIssues = issues.total;
-        previousQAIssues = qaOutput.content.substring(0, 2000);
-        previousSecurityIssues = securityOutput.content.substring(0, 2000);
 
         const roundResult: RoundResult = {
           round,
@@ -191,15 +185,6 @@ export class PipelineOrchestrator {
         ctx.rounds.push(roundResult);
 
         emit({
-          type: "round_complete",
-          data: {
-            round,
-            issues,
-            totalIssues: issues.total,
-          },
-        });
-
-        emit({
           type: "issues_update",
           data: {
             round,
@@ -209,26 +194,89 @@ export class PipelineOrchestrator {
             total: issues.total,
           },
         });
+
+        // ── Apply fixes if there are issues and more rounds remain ──
+        if (totalIssues > 0 && round < MAX_ROUNDS) {
+          emit({
+            type: "round_complete",
+            data: { round, totalIssues, applying_fixes: true },
+          });
+
+          const issuesSummary = [
+            ...issues.qa.slice(0, 10),
+            ...issues.security.slice(0, 10),
+            ...issues.review.slice(0, 5),
+          ].join("\n- ");
+
+          // Fix backend and frontend IN PARALLEL
+          const backendFixPromise: Promise<string> =
+            issues.qa.length + issues.security.length > 0
+              ? this.runAgent(
+                  "backend", "Backend Fix Agent",
+                  this.backendFixAgent.buildPrompt(
+                    ctx.backendCode ?? "",
+                    issues.qa.slice(0, 10).join("\n"),
+                    issues.security.slice(0, 10).join("\n"),
+                    issues.review.slice(0, 5).join("\n"),
+                    ctx.architecture ?? "",
+                  ),
+                  emit,
+                  (o) => fileManager.saveFile(`round-${round}-backend-fixed.ts`, o.content),
+                )
+              : Promise.resolve(ctx.backendCode ?? "");
+
+          const frontendFixPromise: Promise<string> =
+            issues.qa.length + issues.review.length > 0
+              ? this.runAgent(
+                  "frontend", "Frontend Fix Agent",
+                  this.frontendFixAgent.buildPrompt(
+                    ctx.frontendCode ?? "",
+                    issues.qa.slice(0, 10).join("\n"),
+                    issues.review.slice(0, 5).join("\n"),
+                  ),
+                  emit,
+                  (o) => fileManager.saveFile(`round-${round}-frontend-fixed.tsx`, o.content),
+                )
+              : Promise.resolve(ctx.frontendCode ?? "");
+
+          const [fixedBackend, fixedFrontend] = await Promise.all([
+            backendFixPromise,
+            frontendFixPromise,
+          ]);
+
+          // Update the code context for next round's review
+          ctx.backendCode = fixedBackend;
+          ctx.frontendCode = fixedFrontend;
+        } else {
+          emit({
+            type: "round_complete",
+            data: { round, totalIssues, applying_fixes: false },
+          });
+        }
       }
 
-      // Create zip archive
+      // ─── Create ZIP ────────────────────────────────────────────────
+      // Save final code versions
+      await Promise.all([
+        fileManager.saveFile("final-backend.ts", ctx.backendCode ?? ""),
+        fileManager.saveFile("final-frontend.tsx", ctx.frontendCode ?? ""),
+      ]);
+
       const zipPath = await fileManager.createZip();
       const relativePath = zipPath.replace(process.cwd(), "");
 
-      // Save summary
       await this.saveSummary(fileManager, ctx);
 
       const finalIssues = ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0;
       const totalTokens = this.tokenTracker.getTotalTokens();
       const duration = Date.now() - ctx.startTime;
 
-      // Persist completed session
       await saveSession({
         sessionId,
         projectIdea,
         status: "completed",
         totalTokens,
-        roundCount: round,
+        roundCount: ctx.rounds.length,
         finalIssues,
         startedAt: new Date(ctx.startTime).toISOString(),
         completedAt: new Date().toISOString(),
@@ -241,7 +289,7 @@ export class PipelineOrchestrator {
         data: {
           totalTokens,
           tokenSummary: this.tokenTracker.getSummary(),
-          roundCount: round,
+          roundCount: ctx.rounds.length,
           finalIssues,
           zipPath: relativePath,
           sessionId,
@@ -262,61 +310,52 @@ export class PipelineOrchestrator {
         startedAt: new Date(ctx.startTime).toISOString(),
         completedAt: new Date().toISOString(),
         durationMs: Date.now() - ctx.startTime,
-      }).catch(() => {}); // Non-fatal
+      }).catch(() => {});
 
       throw error;
     }
   }
 
+  // ── Helper: run an agent and return just the content string ───────
   private async runAgent(
     agentId: string,
     agentName: string,
     prompt: string,
     emit: (event: SSEEvent) => void,
     onSave?: (output: AgentOutput) => Promise<string>,
+    round?: number,
   ): Promise<string> {
     const output = await this.runAgentWithOutput(
-      agentId,
-      agentName,
-      prompt,
-      emit,
-      onSave,
+      agentId, agentName, prompt, emit, onSave, round,
     );
     return output.content;
   }
 
+  // ── Helper: run an agent and return full AgentOutput ──────────────
   private async runAgentWithOutput(
     agentId: string,
     agentName: string,
     prompt: string,
     emit: (event: SSEEvent) => void,
     onSave?: (output: AgentOutput) => Promise<string>,
+    round?: number,
   ): Promise<AgentOutput> {
-    emit({
-      type: "agent_start",
-      data: { agentId, agentName },
-    });
+    emit({ type: "agent_start", data: { agentId, agentName } });
 
     const agent = this.getAgent(agentId);
 
-    const output = await agent.run(prompt, (streamEvent) => {
+    const onStream: StreamCallback = (streamEvent) => {
       if (streamEvent.type === "thinking") {
-        emit({
-          type: "agent_thinking",
-          data: { agentId, content: streamEvent.content },
-        });
+        emit({ type: "agent_thinking", data: { agentId, content: streamEvent.content } });
       } else if (streamEvent.type === "text") {
-        emit({
-          type: "agent_output",
-          data: { agentId, content: streamEvent.content },
-        });
+        emit({ type: "agent_output", data: { agentId, content: streamEvent.content } });
       } else if (streamEvent.type === "complete") {
         this.tokenTracker.add({
           agentId: agentId as never,
           inputTokens: streamEvent.inputTokens ?? 0,
           outputTokens: streamEvent.outputTokens ?? 0,
+          round,
         });
-
         emit({
           type: "token_update",
           data: {
@@ -327,14 +366,13 @@ export class PipelineOrchestrator {
           },
         });
       }
-    });
+    };
+
+    const output = await agent.run(prompt, onStream);
 
     if (onSave) {
       const filepath = await onSave(output);
-      emit({
-        type: "file_saved",
-        data: { agentId, filepath },
-      });
+      emit({ type: "file_saved", data: { agentId, filepath } });
     }
 
     emit({
@@ -352,17 +390,19 @@ export class PipelineOrchestrator {
     return output;
   }
 
-  private getAgent(agentId: string) {
-    const agents: Record<string, { run: (prompt: string, cb: (e: { type: string; content: string; inputTokens?: number; outputTokens?: number }) => void) => Promise<AgentOutput> }> = {
-      cto: this.ctoAgent,
-      pm: this.pmAgent,
-      backend: this.backendAgent,
+  private getAgent(agentId: string): { run: (p: string, cb: StreamCallback) => Promise<AgentOutput> } {
+    const agents: Record<string, { run: (p: string, cb: StreamCallback) => Promise<AgentOutput> }> = {
+      cto:      this.ctoAgent,
+      pm:       this.pmAgent,
+      backend:  this.backendAgent,
       frontend: this.frontendAgent,
-      qa: this.qaAgent,
+      qa:       this.qaAgent,
       security: this.securityAgent,
-      review: this.reviewAgent,
+      review:   this.reviewAgent,
+      "Backend Fix Agent": this.backendFixAgent,
+      "Frontend Fix Agent": this.frontendFixAgent,
     };
-    const agent = agents[agentId];
+    const agent = agents[agentId] ?? agents[`${agentId} Fix Agent`];
     if (!agent) throw new Error(`Unknown agent: ${agentId}`);
     return agent;
   }
@@ -372,13 +412,10 @@ export class PipelineOrchestrator {
     ctx: PipelineContext,
   ): Promise<void> {
     const roundSummary = ctx.rounds
-      .map(
-        (r) =>
-          `Round ${r.round}: ${r.issues.total} issues (QA: ${r.issues.qa.length}, Security: ${r.issues.security.length}, Review: ${r.issues.review.length})`,
-      )
+      .map((r) => `Round ${r.round}: ${r.issues.total} issues (QA: ${r.issues.qa.length}, Security: ${r.issues.security.length}, Review: ${r.issues.review.length})`)
       .join("\n");
 
-    const summary = `# AI Software Team - Generation Summary
+    const summary = `# AI Software Team — Generation Summary
 
 ## Project Idea
 ${ctx.projectIdea}
@@ -390,7 +427,7 @@ ${ctx.sessionId}
 Total: ${this.tokenTracker.getTotalTokens().toLocaleString()} tokens
 ${Object.entries(this.tokenTracker.getSummary())
   .filter(([k]) => k !== "total")
-  .map(([k, v]) => `- ${k}: ${v.toLocaleString()}`)
+  .map(([k, v]) => `- ${k}: ${(v as number).toLocaleString()}`)
   .join("\n")}
 
 ## Iteration Rounds

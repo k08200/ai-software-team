@@ -1,46 +1,37 @@
 import { BaseAgent } from "./base-agent.js";
 
-const SYSTEM_PROMPT = `You are a Principal Engineer doing final code review. You evaluate code quality, architecture, and maintainability.
+const SYSTEM_PROMPT = `You are a Principal Engineer doing code review.
+
+IMPORTANT: You MUST respond with valid JSON matching this exact schema:
+{
+  "round": number,
+  "architectureScore": 1-10,
+  "architectureSummary": "2-3 sentences on architecture quality",
+  "issues": [
+    {
+      "id": "REV-1",
+      "category": "architecture" | "quality" | "typescript" | "performance" | "async" | "testing" | "documentation",
+      "severity": "high" | "medium" | "low",
+      "description": "specific issue description",
+      "location": "file or function reference if identifiable",
+      "before": "problematic code snippet",
+      "after": "fixed code snippet"
+    }
+  ],
+  "positives": ["what is done well"],
+  "totalIssues": number
+}
 
 Review criteria:
-1. **Architecture**: Clean separation of concerns, SOLID principles
-2. **Code Quality**: Readability, naming, complexity, duplication
-3. **TypeScript**: Proper types, no 'any', no type assertions without justification
-4. **Error Handling**: Explicit errors at every level, no silent failures
-5. **Performance**: N+1 queries, unnecessary computations, missing indexes
-6. **Testing**: Coverage gaps, test quality
-7. **Documentation**: Missing JSDoc for public APIs
-8. **Dependencies**: Unnecessary, outdated, or vulnerable packages
-9. **Immutability**: Mutations of shared state
-10. **Async Patterns**: Unhandled promises, race conditions
+1. Architecture: Clean separation of concerns, SOLID principles
+2. Code Quality: Readability, naming, complexity, duplication
+3. TypeScript: Proper types, no 'any', no unsafe casts
+4. Error Handling: Explicit errors at every level
+5. Performance: N+1 queries, unnecessary work, missing indexes
+6. Async Patterns: Unhandled promises, race conditions
+7. Immutability: Mutations of shared state
 
-Output format — ALWAYS use this exact structure:
-
-## Code Review Report - Round [N]
-
-### Architecture Assessment
-[2-3 sentences on overall architecture quality]
-
-### ISSUES:
-1. [description] - [file reference] - Severity: HIGH/MEDIUM/LOW
-2. ...
-
-### Positive Observations:
-- [What's done well]
-
-### Refactoring Suggestions:
-\`\`\`typescript
-// Before
-// After
-\`\`\`
-
-### Summary
-**Total Review Issues: [N]**
-- High Priority: [n]
-- Medium Priority: [n]
-- Low Priority: [n]
-
-If 0 issues: "**Total Review Issues: 0** - Code meets production quality standards."`;
+If no issues: return issues: [], totalIssues: 0`;
 
 export class ReviewAgent extends BaseAgent {
   constructor() {
@@ -72,16 +63,14 @@ ${qaIssues}
 ${securityIssues}
 
 ## Architecture Reference:
-${architecture.substring(0, 2000)}
+${architecture}
 
-## Backend Code:
-${backendCode.substring(0, 5000)}
+## Backend Code (FULL):
+${backendCode}
 
-## Frontend Code:
-${frontendCode.substring(0, 4000)}
+## Frontend Code (FULL):
+${frontendCode}
 
-Perform comprehensive code review for Round ${round}.
-Consider the QA and Security issues as context.
-Focus on code quality, architecture, and maintainability.`;
+Respond ONLY with valid JSON as specified. No markdown, no explanation outside the JSON.`;
   }
 }

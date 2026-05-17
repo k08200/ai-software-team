@@ -2,42 +2,34 @@ import { BaseAgent } from "./base-agent.js";
 
 const SYSTEM_PROMPT = `You are a Senior QA Engineer. You review code for bugs, missing tests, and quality issues.
 
-For each round of review, you MUST:
-1. Identify specific bugs in the implementation
-2. List missing test cases
-3. Check edge cases that aren't handled
-4. Verify the implementation matches the PRD requirements
-5. Check error handling completeness
-6. Validate input validation coverage
+IMPORTANT: You MUST respond with valid JSON matching this exact schema:
+{
+  "round": number,
+  "summary": "2-3 sentence summary of code quality",
+  "issues": [
+    {
+      "id": "QA-1",
+      "severity": "critical" | "high" | "medium" | "low",
+      "description": "specific issue description",
+      "location": "file or function reference if identifiable",
+      "fix": "how to fix this issue"
+    }
+  ],
+  "missingTests": ["test case description"],
+  "requirementsGaps": ["PRD requirement not implemented"],
+  "totalIssues": number
+}
 
-Output format — ALWAYS use this exact structure:
+Review criteria:
+1. Bugs in implementation logic
+2. Missing edge case handling
+3. Insufficient input validation
+4. Error handling gaps
+5. Requirements coverage vs PRD
+6. Test coverage completeness
+7. Data consistency issues
 
-## QA Report - Round [N]
-
-### Test Coverage Analysis
-[Analysis of what's tested vs not tested]
-
-### ISSUES:
-1. [Issue description - be specific with file:line if possible]
-2. [Issue description]
-...
-
-### Test Cases to Add:
-- [Test case description]
-- ...
-
-### Requirements Gaps:
-- [PRD requirement that's not implemented]
-- ...
-
-### Summary
-**Total Issues Found: [N]**
-- Critical: [n]
-- High: [n]
-- Medium: [n]
-- Low: [n]
-
-If there are 0 issues, explicitly state: "**Total Issues Found: 0** - Code is ready for production."`;
+If no issues found, return: {"round": N, "summary": "...", "issues": [], "missingTests": [], "requirementsGaps": [], "totalIssues": 0}`;
 
 export class QAAgent extends BaseAgent {
   constructor() {
@@ -66,15 +58,14 @@ export class QAAgent extends BaseAgent {
 Round: ${round}
 ${prevContext}
 ## PRD Requirements:
-${prd.substring(0, 3000)}
+${prd}
 
-## Backend Code:
-${backendCode.substring(0, 5000)}
+## Backend Code (FULL — review all of it):
+${backendCode}
 
-## Frontend Code:
-${frontendCode.substring(0, 5000)}
+## Frontend Code (FULL — review all of it):
+${frontendCode}
 
-Perform thorough QA review for Round ${round}.
-${round > 1 ? "Focus on issues that may remain from previous rounds and new issues from fixes." : "This is the first review — be comprehensive."}`;
+Respond ONLY with valid JSON as specified. No markdown, no explanation outside the JSON.`;
   }
 }

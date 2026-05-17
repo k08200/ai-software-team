@@ -2,56 +2,36 @@ import { BaseAgent } from "./base-agent.js";
 
 const SYSTEM_PROMPT = `You are a Senior Security Engineer. You review code against OWASP Top 10 and security best practices.
 
-OWASP Top 10 (2021) checklist you MUST check:
-1. A01: Broken Access Control
-2. A02: Cryptographic Failures
-3. A03: Injection (SQL, NoSQL, Command, XSS)
-4. A04: Insecure Design
-5. A05: Security Misconfiguration
-6. A06: Vulnerable and Outdated Components
-7. A07: Identification and Authentication Failures
-8. A08: Software and Data Integrity Failures
-9. A09: Security Logging and Monitoring Failures
-10. A10: Server-Side Request Forgery (SSRF)
+IMPORTANT: You MUST respond with valid JSON matching this exact schema:
+{
+  "round": number,
+  "owaspStatus": {
+    "A01_AccessControl": "pass" | "fail" | "warning",
+    "A02_CryptoFailures": "pass" | "fail" | "warning",
+    "A03_Injection": "pass" | "fail" | "warning",
+    "A04_InsecureDesign": "pass" | "fail" | "warning",
+    "A05_SecurityMisconfiguration": "pass" | "fail" | "warning",
+    "A06_VulnerableComponents": "pass" | "fail" | "warning",
+    "A07_AuthFailures": "pass" | "fail" | "warning",
+    "A08_IntegrityFailures": "pass" | "fail" | "warning",
+    "A09_LoggingFailures": "pass" | "fail" | "warning",
+    "A10_SSRF": "pass" | "fail" | "warning"
+  },
+  "issues": [
+    {
+      "id": "SEC-1",
+      "owasp": "A03",
+      "severity": "critical" | "high" | "medium" | "low",
+      "description": "specific vulnerability description",
+      "location": "file or line reference if identifiable",
+      "fix": "remediation code or steps"
+    }
+  ],
+  "hardcodedSecrets": boolean,
+  "totalIssues": number
+}
 
-Additional checks:
-- Hardcoded secrets or API keys
-- Insecure direct object references (IDOR)
-- Missing rate limiting
-- Missing CORS configuration
-- Insecure JWT handling
-- Missing input sanitization
-- Path traversal vulnerabilities
-- Insecure file uploads
-
-Output format — ALWAYS use this exact structure:
-
-## Security Report - Round [N]
-
-### OWASP Checklist Status:
-| Category | Status | Notes |
-|----------|--------|-------|
-| A01: Access Control | ✅/⚠️/❌ | ... |
-...
-
-### ISSUES:
-1. [CRITICAL/HIGH/MEDIUM/LOW] [vulnerability description with file reference]
-2. ...
-
-### Remediation Code:
-For each issue, provide the fix:
-\`\`\`typescript
-// Fixed code
-\`\`\`
-
-### Summary
-**Total Security Issues: [N]**
-- Critical: [n]
-- High: [n]
-- Medium: [n]
-- Low: [n]
-
-If there are 0 issues: "**Total Security Issues: 0** - Code passes security review."`;
+Check ALL OWASP Top 10 categories. Be specific. If clean, return issues: [].`;
 
 export class SecurityAgent extends BaseAgent {
   constructor() {
@@ -72,20 +52,18 @@ export class SecurityAgent extends BaseAgent {
     previousIssues?: string,
   ): string {
     const prevContext = previousIssues
-      ? `\n## Previously Identified Issues:\n${previousIssues}\n`
+      ? `\n## Previously Identified Issues (verify these are fixed):\n${previousIssues}\n`
       : "";
 
     return `Product Idea: "${projectIdea}"
 Round: ${round}
 ${prevContext}
-## Backend Code:
-${backendCode.substring(0, 6000)}
+## Backend Code (FULL — review ALL of it):
+${backendCode}
 
-## Frontend Code:
-${frontendCode.substring(0, 4000)}
+## Frontend Code (FULL — review ALL of it):
+${frontendCode}
 
-Perform comprehensive security review for Round ${round}.
-Check ALL OWASP Top 10 categories. Be specific about vulnerable code locations.
-${round > 1 ? "Verify that previously identified vulnerabilities have been fixed." : ""}`;
+Respond ONLY with valid JSON as specified. No markdown, no explanation outside the JSON.`;
   }
 }
