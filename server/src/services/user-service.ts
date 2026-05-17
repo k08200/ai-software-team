@@ -5,6 +5,16 @@ import { db } from "../db/index.js";
 import { users, PLAN_LIMITS } from "../db/schema.js";
 import { config } from "../config.js";
 import type { User, NewUser, Plan } from "../db/schema.js";
+import {
+  memRegister,
+  memLogin,
+  memGetUser,
+  memCheckRunQuota,
+  memIncrementRunCount,
+} from "./memory-store.js";
+
+// When DATABASE_URL is not set, use the in-memory store for all user ops
+const USE_MEMORY = !config.database.url;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -110,6 +120,8 @@ export async function register(
   email: string,
   password: string
 ): Promise<AuthResult> {
+  if (USE_MEMORY) return memRegister(email, password);
+
   const existing = await db
     .select({ id: users.id })
     .from(users)
@@ -151,6 +163,8 @@ export async function login(
   email: string,
   password: string
 ): Promise<AuthResult> {
+  if (USE_MEMORY) return memLogin(email, password);
+
   const [found] = await db
     .select()
     .from(users)
@@ -175,6 +189,8 @@ export async function login(
 // ---------------------------------------------------------------------------
 
 export async function getUser(id: string): Promise<PublicUser> {
+  if (USE_MEMORY) return memGetUser(id);
+
   const [found] = await db
     .select()
     .from(users)
@@ -216,6 +232,8 @@ export async function updatePlan(userId: string, plan: Plan): Promise<PublicUser
  * Resets the counter automatically when a new billing period starts.
  */
 export async function checkRunQuota(userId: string): Promise<boolean> {
+  if (USE_MEMORY) return memCheckRunQuota(userId);
+
   const [found] = await db
     .select({
       id: users.id,
@@ -263,6 +281,8 @@ export async function checkRunQuota(userId: string): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 export async function incrementRunCount(userId: string): Promise<void> {
+  if (USE_MEMORY) { memIncrementRunCount(userId); return; }
+
   const [found] = await db
     .select({
       id: users.id,

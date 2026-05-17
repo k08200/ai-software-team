@@ -26,8 +26,13 @@ export const config = {
   nodeEnv: optional("NODE_ENV", "development"),
   clientOrigin: optional("CLIENT_ORIGIN", "http://localhost:3000"),
 
+  demoMode: optional("DEMO_MODE", "false") === "true",
+
   anthropic: {
-    apiKey: required("ANTHROPIC_API_KEY"),
+    // In demo mode the API key is not used — skip the required() check
+    apiKey: optional("DEMO_MODE", "false") === "true"
+      ? optional("ANTHROPIC_API_KEY", "demo-key")
+      : required("ANTHROPIC_API_KEY"),
     model: optional("ANTHROPIC_MODEL", "claude-opus-4-6"),
     thinkingBudget: optionalInt("THINKING_BUDGET", 8000),
   },

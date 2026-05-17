@@ -4,6 +4,9 @@ import { db } from "../db/index.js";
 import { apiKeys, users } from "../db/schema.js";
 import type { ApiKey } from "../db/schema.js";
 import type { AuthUser } from "../middleware/auth.js";
+import { config } from "../config.js";
+
+const USE_MEMORY = !config.database.url;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -138,6 +141,8 @@ export async function listKeys(userId: string): Promise<ApiKeyPublic[]> {
 // ---------------------------------------------------------------------------
 
 export async function validateKey(rawKey: string): Promise<AuthUser | null> {
+  if (USE_MEMORY) return null;   // No API keys in demo/file-based mode
+
   if (!rawKey.startsWith(KEY_PREFIX)) {
     return null;
   }

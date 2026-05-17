@@ -368,7 +368,7 @@ export class PipelineOrchestrator {
       }
     };
 
-    const output = await agent.run(prompt, onStream);
+    const output = await agent.run(prompt, onStream, round);
 
     if (onSave) {
       const filepath = await onSave(output);
@@ -390,7 +390,7 @@ export class PipelineOrchestrator {
     return output;
   }
 
-  private getAgent(agentId: string): { run: (p: string, cb: StreamCallback) => Promise<AgentOutput> } {
+  private getAgent(agentId: string): { run: (p: string, cb: StreamCallback, round?: number) => Promise<AgentOutput> } {
     const agents: Record<string, { run: (p: string, cb: StreamCallback) => Promise<AgentOutput> }> = {
       cto:      this.ctoAgent,
       pm:       this.pmAgent,

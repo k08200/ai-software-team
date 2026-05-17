@@ -14,9 +14,18 @@ type StripeInvoice = Awaited<ReturnType<InstanceType<typeof Stripe>["invoices"][
 // Stripe client
 // ---------------------------------------------------------------------------
 
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: "2026-04-22.dahlia",
-});
+// Lazy-initialize Stripe — only construct the client when a key is present.
+// Without a key (demo mode / no billing), the stripe service gracefully returns errors.
+let _stripe: InstanceType<typeof Stripe> | null = null;
+function getStripe(): InstanceType<typeof Stripe> {
+  if (!config.stripe.secretKey) {
+    throw new Error("Stripe is not configured. Set STRIPE_SECRET_KEY to enable billing.");
+  }
+  if (!_stripe) {
+    _stripe = new Stripe(config.stripe.secretKey, { apiVersion: "2026-04-22.dahlia" });
+  }
+  return _stripe;
+}
 
 // ---------------------------------------------------------------------------
 // Price ID constants (sourced from env via config)
@@ -48,7 +57,7 @@ export async function createCustomer(
   email: string,
   userId: string
 ): Promise<string> {
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email,
     metadata: { userId },
   });
@@ -87,7 +96,7 @@ export async function createCheckoutSession(
   const customerId =
     user.stripeCustomerId ?? (await createCustomer(user.email, userId));
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
@@ -122,7 +131,7 @@ export async function createPortalSession(userId: string): Promise<string> {
     throw new Error("No Stripe customer found for this user.");
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  const session = await getStripe().billingPortal.sessions.create({
     customer: user.stripeCustomerId,
     return_url: `${config.clientOrigin}/billing`,
   });
@@ -137,7 +146,7 @@ export async function createPortalSession(userId: string): Promise<string> {
 export async function cancelSubscription(
   subscriptionId: string
 ): Promise<void> {
-  await stripe.subscriptions.cancel(subscriptionId);
+  await getStripe().subscriptions.cancel(subscriptionId);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +200,7 @@ export async function handleWebhook(
   let event: StripeEvent;
 
   try {
-    event = stripe.webhooks.constructEvent(
+    event = getStripe().webhooks.constructEvent(
       rawBody,
       signature,
       config.stripe.webhookSecret
@@ -344,6 +353,6 @@ async function handleInvoicePaid(invoice: StripeInvoice): Promise<void> {
 
   if (!subscriptionId) return;
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
   await handleSubscriptionChange(subscription);
 }

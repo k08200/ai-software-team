@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentConfig, AgentOutput, AgentId } from "../types.js";
+import { getDemoThinking, getDemoResponse, type DemoAgentId } from "../utils/demo-data.js";
 
 export type StreamCallback = (event: {
   type: "thinking" | "text" | "complete";
@@ -10,6 +11,20 @@ export type StreamCallback = (event: {
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6";
 const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET ?? "8000", 10);
+const DEMO_MODE = process.env.DEMO_MODE === "true";
+
+// Fake token counts for demo — realistic-looking numbers
+const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
+  cto:                 [1200,  3200],
+  pm:                  [1800,  4100],
+  backend:             [2400,  8200],
+  frontend:            [2600,  9100],
+  qa:                  [3200,  2400],
+  security:            [2900,  1800],
+  review:              [3100,  2100],
+  "Backend Fix Agent": [5800,  7400],
+  "Frontend Fix Agent":[6200,  8100],
+};
 
 export abstract class BaseAgent {
   protected client: Anthropic;
@@ -17,7 +32,7 @@ export abstract class BaseAgent {
 
   constructor(config: Omit<AgentConfig, "model" | "thinkingBudget"> & { model?: string; thinkingBudget?: number }) {
     this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+      apiKey: process.env.ANTHROPIC_API_KEY ?? "demo-key",
     });
     this.config = {
       ...config,
@@ -29,7 +44,58 @@ export abstract class BaseAgent {
   async run(
     userMessage: string,
     onStream: StreamCallback,
+    round?: number,
   ): Promise<AgentOutput> {
+    if (DEMO_MODE) {
+      return this.runDemo(onStream, round);
+    }
+    return this.runLive(userMessage, onStream);
+  }
+
+  // ── Demo mode: stream pre-written responses with realistic delays ──────
+  private async runDemo(onStream: StreamCallback, round?: number): Promise<AgentOutput> {
+    const startTime = Date.now();
+    // Fix agents have agentId "backend"/"frontend" but we want their named variant
+    const agentKey = (
+      this.config.agentName === "Backend Fix Agent" ? "Backend Fix Agent" :
+      this.config.agentName === "Frontend Fix Agent" ? "Frontend Fix Agent" :
+      this.config.agentId ?? this.config.agentName
+    ) as DemoAgentId;
+    const [inputTokens, outputTokens] = DEMO_TOKEN_MAP[agentKey] ?? [1000, 2000];
+
+    // Stream thinking block
+    const thinking = getDemoThinking(agentKey);
+    for (const char of thinking) {
+      onStream({ type: "thinking", content: char });
+      await sleep(2);
+    }
+
+    // Stream main response
+    const response = getDemoResponse(agentKey, round);
+    const CHUNK_SIZE = 8;
+    for (let i = 0; i < response.length; i += CHUNK_SIZE) {
+      const chunk = response.slice(i, i + CHUNK_SIZE);
+      onStream({ type: "text", content: chunk });
+      await sleep(12);
+    }
+
+    onStream({ type: "complete", content: response, inputTokens, outputTokens });
+
+    return {
+      agentId: this.config.agentId,
+      agentName: this.config.agentName,
+      content: response,
+      thinkingContent: thinking,
+      tokensUsed: inputTokens + outputTokens,
+      inputTokens,
+      outputTokens,
+      duration: Date.now() - startTime,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // ── Live mode: call Claude API ─────────────────────────────────────────
+  private async runLive(userMessage: string, onStream: StreamCallback): Promise<AgentOutput> {
     const startTime = Date.now();
     let fullText = "";
     let thinkingText = "";
@@ -68,12 +134,7 @@ export abstract class BaseAgent {
       inputTokens = finalMessage.usage.input_tokens;
       outputTokens = finalMessage.usage.output_tokens;
 
-      onStream({
-        type: "complete",
-        content: fullText,
-        inputTokens,
-        outputTokens,
-      });
+      onStream({ type: "complete", content: fullText, inputTokens, outputTokens });
 
       return {
         agentId: this.config.agentId,
@@ -91,6 +152,10 @@ export abstract class BaseAgent {
       throw new Error(`[${this.config.agentName}] API error: ${message}`);
     }
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function getAgentColor(agentId: AgentId): string {
