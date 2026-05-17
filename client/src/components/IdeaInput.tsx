@@ -1,0 +1,114 @@
+import { useState, type FormEvent } from "react";
+import { usePipelineStore } from "../store/pipeline-store.js";
+import { usePipeline } from "../hooks/usePipeline.js";
+
+const EXAMPLES = [
+  "할 일 앱 만들어줘",
+  "실시간 채팅 앱 만들어줘",
+  "AI 기반 레시피 추천 서비스",
+  "URL 단축 서비스",
+  "개인 블로그 플랫폼",
+];
+
+export function IdeaInput() {
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
+  const { run, cancel } = usePipeline();
+  const status = usePipelineStore((s) => s.status);
+  const setProjectIdea = usePipelineStore((s) => s.setProjectIdea);
+
+  const isRunning = status === "running";
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const idea = input.trim();
+
+    if (!idea) {
+      setError("제품 아이디어를 입력해주세요.");
+      return;
+    }
+    if (idea.length < 5) {
+      setError("최소 5자 이상 입력해주세요.");
+      return;
+    }
+
+    setError("");
+    setProjectIdea(idea);
+    await run(idea);
+  };
+
+  const handleExample = (example: string) => {
+    setInput(example);
+    setError("");
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="relative">
+          <textarea
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              if (error) setError("");
+            }}
+            placeholder="제품 아이디어를 한 문장으로 입력하세요... (예: 할 일 앱 만들어줘)"
+            rows={3}
+            maxLength={1000}
+            disabled={isRunning}
+            className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 text-sm resize-none focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Product idea input"
+            aria-invalid={!!error}
+            aria-describedby={error ? "input-error" : undefined}
+          />
+          <div className="absolute bottom-2 right-3 text-xs text-gray-600">
+            {input.length}/1000
+          </div>
+        </div>
+
+        {error && (
+          <p id="input-error" className="text-red-400 text-xs" role="alert">
+            {error}
+          </p>
+        )}
+
+        {/* Example chips */}
+        {!isRunning && (
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs text-gray-500">예시:</span>
+            {EXAMPLES.map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => handleExample(example)}
+                className="text-xs text-gray-400 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-500 px-3 py-1 rounded-full transition-colors"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {!isRunning ? (
+            <button
+              type="submit"
+              className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isRunning}
+            >
+              🚀 AI팀 시작하기
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={cancel}
+              className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 border border-red-800 hover:border-red-600 font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+            >
+              ✕ 중단하기
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
+  );
+}
