@@ -1,6 +1,34 @@
 import axios, { type AxiosError, type AxiosResponse } from "axios";
 import type { AuthResponse, User, ApiKey, Run, BillingPlan } from "../types/auth.js";
 
+// Server-side session shape (pipeline/sessions endpoint)
+interface SessionRecord {
+  sessionId: string;
+  projectIdea: string;
+  status: "running" | "completed" | "error";
+  totalTokens: number;
+  roundCount: number;
+  finalIssues: number;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  zipPath?: string;
+}
+
+function toRun(s: SessionRecord): Run {
+  return {
+    id: s.sessionId,
+    sessionId: s.sessionId,
+    projectIdea: s.projectIdea,
+    status: s.status,
+    totalTokens: s.totalTokens,
+    roundCount: s.roundCount,
+    createdAt: s.startedAt,          // map startedAt → createdAt
+    durationMs: s.durationMs ?? null,
+    zipReady: !!s.zipPath,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Axios instance
 // ---------------------------------------------------------------------------
@@ -96,15 +124,15 @@ export const api = {
 
   runs: {
     list: async (): Promise<Run[]> => {
-      const response = await apiClient.get<Run[]>("/pipeline/sessions");
-      return response.data;
+      const response = await apiClient.get<SessionRecord[]>("/pipeline/sessions");
+      return (response.data ?? []).map(toRun);
     },
 
     get: async (sessionId: string): Promise<Run> => {
-      const response = await apiClient.get<Run>(
+      const response = await apiClient.get<SessionRecord>(
         `/pipeline/sessions/${sessionId}`,
       );
-      return response.data;
+      return toRun(response.data);
     },
   },
 

@@ -40,10 +40,15 @@ function setAxiosAuth(token: string | null): void {
 // Store
 // ---------------------------------------------------------------------------
 
+// If a token is already in storage, start in loading state so ProtectedRoute
+// shows the spinner instead of immediately redirecting to /login.
+const hasStoredToken =
+  typeof window !== "undefined" && !!localStorage.getItem(TOKEN_KEY);
+
 export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   user: null,
   token: null,
-  isLoading: false,
+  isLoading: hasStoredToken,
   error: null,
 
   setUser: (user) => set({ user }),
