@@ -1,0 +1,47 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ai-software-team.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ai-software-team.labels" . | nindent 4 }}
+  annotations:
+    # ── nginx ingress controller ─────────────────────────────────────────────
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | quote }}
+    # SSE streams can run for minutes — increase timeouts accordingly
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    # Disable buffering so SSE events reach the client immediately
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Accel-Buffering "no";
+    {{- if .Values.ingress.tls }}
+    # ── cert-manager TLS ──────────────────────────────────────────────────────
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname | quote }}
+      secretName: {{ .Values.ingress.tlsSecretName | default (printf "%s-tls" (include "ai-software-team.fullname" .)) }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ai-software-team.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

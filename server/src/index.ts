@@ -4,93 +4,116 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
+import { config } from "./config.js";
 import pipelineRouter from "./routes/pipeline.js";
+import authRouter from "./routes/auth.js";
+import apiKeysRouter from "./routes/api-keys.js";
+import billingRouter from "./routes/billing.js";
 import { scheduleCleanup } from "./utils/cleanup.js";
-
-const PORT = parseInt(process.env.PORT ?? "3001", 10);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? "http://localhost:3000";
-
-// Validate required environment variables
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error("ERROR: ANTHROPIC_API_KEY environment variable is required.");
-  process.exit(1);
-}
 
 const app = express();
 
-// Ensure outputs directory exists
+// ── Outputs directory ────────────────────────────────────────────────────────
 const outputsDir = path.join(process.cwd(), "outputs");
 if (!fs.existsSync(outputsDir)) {
   fs.mkdirSync(outputsDir, { recursive: true });
 }
 
-// Rate limiting: max 5 pipeline runs per IP per 15 minutes
+// ── Rate limiters ────────────────────────────────────────────────────────────
 const pipelineLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: config.rateLimit.pipelineWindowMs,
+  max: config.rateLimit.pipelineMax,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests. Maximum 5 pipeline runs per 15 minutes." },
-  skip: (req) => req.method !== "POST", // Only rate-limit POST /run
+  message: { error: `Too many requests. Maximum ${config.rateLimit.pipelineMax} pipeline runs per 15 minutes.` },
+  skip: (req) => req.method !== "POST",
 });
 
-// General API rate limit: 100 requests per minute
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many requests. Please slow down." },
+  message: { error: "Too many requests." },
 });
 
-// Middleware
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many auth attempts. Try again in 15 minutes." },
+});
+
+// ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: CLIENT_ORIGIN,
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  origin: config.clientOrigin,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
 }));
 
+// Stripe webhook needs raw body — mount BEFORE express.json()
+app.use("/api/billing/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json({ limit: "10kb" }));
-app.use("/api/pipeline", generalLimiter);
-app.use("/api/pipeline/run", pipelineLimiter);
+app.use(generalLimiter);
 
-// Routes
-app.use("/api/pipeline", pipelineRouter);
+// ── Routes ───────────────────────────────────────────────────────────────────
+app.use("/api/auth", authLimiter, authRouter);
+app.use("/api/keys", apiKeysRouter);
+app.use("/api/billing", billingRouter);
+app.use("/api/pipeline", pipelineLimiter, pipelineRouter);
 
-// Health check
+// ── Static client (production) ───────────────────────────────────────────────
+if (config.nodeEnv === "production") {
+  const clientDist = path.join(process.cwd(), "public");
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(clientDist, "index.html"));
+    });
+  }
+}
+
+// ── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    version: "2.0.0",
+    model: config.anthropic.model,
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// 404 handler
+// ── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
-  res.status(404).json({ error: "Not found" });
+  res.status(404).json({ success: false, error: "Not found" });
 });
 
-// Error handler
+// ── Error handler ─────────────────────────────────────────────────────────────
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("[Server Error]", err.message);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ success: false, error: "Internal server error" });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`AI Software Team server running on http://localhost:${PORT}`);
-  console.log(`Model: ${process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6"}`);
-  console.log(`Max rounds: ${process.env.MAX_ROUNDS ?? "3"}`);
-  console.log(`Rate limit: 5 pipeline runs per 15 minutes per IP`);
+// ── Listen ────────────────────────────────────────────────────────────────────
+const server = app.listen(config.port, () => {
+  console.log(`\n🤖 AI Software Engineering Team v2.0`);
+  console.log(`   Server: http://localhost:${config.port}`);
+  console.log(`   Model:  ${config.anthropic.model}`);
+  console.log(`   Rounds: min=${config.pipeline.minRounds} max=${config.pipeline.maxRounds}`);
+  console.log(`   DB:     ${config.database.url ? "PostgreSQL connected" : "No DB (file-based mode)"}`);
+  console.log(`   Stripe: ${config.stripe.secretKey ? "enabled" : "disabled"}\n`);
 
-  // Schedule periodic cleanup of old output files (runs every hour)
   scheduleCleanup();
 });
 
-// Graceful shutdown
 process.on("SIGTERM", () => {
   console.log("SIGTERM received, shutting down gracefully...");
   server.close(() => process.exit(0));
 });
 
 process.on("SIGINT", () => {
-  console.log("SIGINT received, shutting down...");
   server.close(() => process.exit(0));
 });
 

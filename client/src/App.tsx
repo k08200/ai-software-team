@@ -1,129 +1,128 @@
-import { usePipelineStore } from "./store/pipeline-store.js";
-import { IdeaInput } from "./components/IdeaInput.js";
-import { PipelineStatus } from "./components/PipelineStatus.js";
-import { AgentPanel } from "./components/AgentPanel.js";
-import { TokenCounter } from "./components/TokenCounter.js";
-import { RoundProgress } from "./components/RoundProgress.js";
-import { CompletionPanel } from "./components/CompletionPanel.js";
-import { CostEstimate } from "./components/CostEstimate.js";
-import { SessionHistory } from "./components/SessionHistory.js";
-import type { AgentId } from "./types/index.js";
+import { useEffect, type ReactNode } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
+import { useAuthStore } from "./store/auth-store.js";
+import { Layout } from "./components/Layout.js";
+import { LandingPage } from "./pages/LandingPage.js";
+import { LoginPage } from "./pages/LoginPage.js";
+import { RegisterPage } from "./pages/RegisterPage.js";
+import { DashboardPage } from "./pages/DashboardPage.js";
+import { PipelinePage } from "./pages/PipelinePage.js";
+import { SettingsPage } from "./pages/SettingsPage.js";
 
-const ALL_AGENTS: AgentId[] = [
-  "cto", "pm", "backend", "frontend", "qa", "security", "review",
-];
+// ---------------------------------------------------------------------------
+// Auth guard
+// ---------------------------------------------------------------------------
 
-function Header() {
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const user = useAuthStore((s) => s.user);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div
+          className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"
+          aria-label="Loading"
+        />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Navigate to="/login" state={{ from: location.pathname }} replace />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+// ---------------------------------------------------------------------------
+// Auth initializer — runs once on mount
+// ---------------------------------------------------------------------------
+
+function AuthLoader({ children }: { children: ReactNode }) {
+  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
+
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+
+  return <>{children}</>;
+}
+
+// ---------------------------------------------------------------------------
+// App routes
+// ---------------------------------------------------------------------------
+
+function AppRoutes() {
   return (
-    <header className="text-center py-12 px-4">
-      <div className="inline-flex items-center gap-2 text-xs text-purple-400 bg-purple-900/20 border border-purple-800/40 px-3 py-1.5 rounded-full mb-6">
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse inline-block" />
-        Powered by Claude with Extended Thinking
-      </div>
-      <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4 tracking-tight">
-        AI Software Engineering Team
-      </h1>
-      <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-        한 줄 아이디어 → 7개 AI 에이전트 → 완전한 프로덕션 코드
-      </p>
-      <div className="flex items-center justify-center gap-6 mt-6 text-sm text-gray-500">
-        <span className="flex items-center gap-1.5">
-          🏗️ CTO <span className="text-gray-700">→</span>
-          📋 PM <span className="text-gray-700">→</span>
-          ⚙️ Backend <span className="text-gray-700">→</span>
-          🎨 Frontend
-        </span>
-        <span className="text-gray-700">⟳</span>
-        <span className="flex items-center gap-1.5">
-          🧪 QA + 🔒 Security + 👁️ Review
-        </span>
-      </div>
-    </header>
+    <Routes>
+      {/* Public */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+
+      {/* Protected — wrapped in Layout */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <DashboardPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pipeline"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PipelinePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SettingsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Catch-all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
-function ActiveAgents() {
-  const agents = usePipelineStore((s) => s.agents);
-  const status = usePipelineStore((s) => s.status);
-
-  if (status === "idle") return null;
-
-  const activeAgents = ALL_AGENTS.filter(
-    (id) => agents[id].status !== "pending",
-  );
-
-  if (activeAgents.length === 0) return null;
-
-  return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
-        Agent Outputs
-      </h2>
-      <div className="space-y-3">
-        {activeAgents.map((agentId) => (
-          <AgentPanel key={agentId} agentId={agentId} />
-        ))}
-      </div>
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Root
+// ---------------------------------------------------------------------------
 
 export function App() {
-  const status = usePipelineStore((s) => s.status);
-  const projectIdea = usePipelineStore((s) => s.projectIdea);
-
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-5xl mx-auto px-4 pb-24">
-        <Header />
-
-        {/* Current project context */}
-        {status !== "idle" && projectIdea && (
-          <div className="mb-6 px-4 py-3 bg-gray-900 rounded-xl border border-gray-700 text-sm">
-            <span className="text-gray-500">Building: </span>
-            <span className="text-white font-medium">{projectIdea}</span>
-          </div>
-        )}
-
-        {/* Input area */}
-        {status === "idle" ? (
-          <div className="mb-12">
-            <IdeaInput />
-            <CostEstimate />
-            <div className="mt-8">
-              <SessionHistory />
-            </div>
-          </div>
-        ) : (
-          <div className="mb-6">
-            <IdeaInput />
-          </div>
-        )}
-
-        {/* Stats grid */}
-        {status !== "idle" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <TokenCounter />
-            <RoundProgress />
-          </div>
-        )}
-
-        {/* Pipeline visualization */}
-        <div className="mb-6">
-          <PipelineStatus />
-        </div>
-
-        {/* Completion panel */}
-        {(status === "completed" || status === "error") && (
-          <div className="mb-6">
-            <CompletionPanel />
-          </div>
-        )}
-
-        {/* Agent output panels */}
-        <ActiveAgents />
-      </div>
-    </div>
+    <BrowserRouter>
+      <AuthLoader>
+        <AppRoutes />
+      </AuthLoader>
+    </BrowserRouter>
   );
 }
 

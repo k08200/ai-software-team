@@ -1,0 +1,181 @@
+# Default values for ai-software-team.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/k08200/ai-software-team
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/health"
+  prometheus.io/port: "3001"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # Must be false: app writes to /app/outputs
+  runAsNonRoot: true
+  runAsUser: 1001
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3001
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hostname: "ai-team.example.com"
+  tls: true
+  tlsSecretName: "ai-team-tls"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    # Required for SSE: disable buffering so events stream through immediately
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Accel-Buffering "no";
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# PostgreSQL sub-chart (bitnami/postgresql)
+postgresql:
+  enabled: false  # Set to true to deploy bundled PostgreSQL
+  auth:
+    database: "ai_software_team"
+    username: "ai_team"
+    # In production, override this with --set postgresql.auth.password=...
+    # or use an external secret
+    password: "changeme"
+    postgresPassword: "changeme_admin"
+  primary:
+    persistence:
+      enabled: true
+      size: "10Gi"
+  # If postgresql.enabled is false, set this to your external PostgreSQL URL
+  externalUrl: ""
+
+# Redis sub-chart (bitnami/redis)
+redis:
+  enabled: false  # Set to true to deploy bundled Redis
+  auth:
+    enabled: true
+    password: "changeme_redis"
+  master:
+    persistence:
+      enabled: true
+      size: "2Gi"
+  # If redis.enabled is false, set this to your external Redis URL
+  externalUrl: ""
+
+# Environment variables
+# Sensitive values (ANTHROPIC_API_KEY, JWT_SECRET, STRIPE_SECRET_KEY, DATABASE_URL)
+# are stored in the Kubernetes Secret — set them via --set or external-secrets.
+env:
+  # ── Application ─────────────────────────────────────────────────────────────
+  NODE_ENV: "production"
+  PORT: "3001"
+
+  # Anthropic model to use (override if needed)
+  ANTHROPIC_MODEL: "claude-opus-4-6"
+
+  # Max improvement rounds per pipeline run (1–10)
+  MAX_ROUNDS: "3"
+
+  # CORS: allowed client origin
+  CLIENT_ORIGIN: "https://ai-team.example.com"
+
+  # Stripe pricing plan ID (optional — for billing integration)
+  STRIPE_PRICE_ID: ""
+
+  # ── Secrets (values below go into the Secret, not the ConfigMap) ───────────
+  # Override these with external-secrets or --set in CI/CD:
+  #   --set secrets.anthropicApiKey=sk-ant-...
+  #   --set secrets.jwtSecret=...
+  #   --set secrets.stripeSecretKey=sk_live_...
+  #   --set secrets.databaseUrl=postgresql://...
+
+secrets:
+  anthropicApiKey: "REPLACE_ME"
+  jwtSecret: "REPLACE_ME_32_CHAR_MINIMUM_SECRET"
+  stripeSecretKey: ""
+  # If postgresql.enabled=true, this is auto-computed. Otherwise set manually.
+  databaseUrl: ""
+
+# Persistence for /app/outputs (generated project ZIPs)
+persistence:
+  enabled: true
+  storageClass: ""  # "" = use cluster default
+  accessMode: ReadWriteOnce
+  size: "10Gi"
+  mountPath: "/app/outputs"
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3001
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Additional volume mounts (e.g. for mounting TLS certs or configs)
+extraVolumes: []
+extraVolumeMounts: []
+
+# Node selector, tolerations, affinity
+nodeSelector: {}
+tolerations: []
+affinity: {}

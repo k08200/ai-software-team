@@ -1,0 +1,176 @@
+{
+  "name": "ai-software-team",
+  "displayName": "AI Software Engineering Team",
+  "description": "7-agent autonomous code generation — PM, CTO, Backend, Frontend, QA, Security, Reviewer",
+  "version": "1.0.0",
+  "publisher": "k08200",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "code generation",
+    "claude",
+    "anthropic",
+    "autonomous"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/k08200/ai-software-team"
+  },
+  "activationEvents": [
+    "onCommand:ai-team.runPipeline",
+    "onCommand:ai-team.showHistory",
+    "onCommand:ai-team.openDashboard",
+    "onCommand:ai-team.configure",
+    "onCommand:ai-team.cancelPipeline",
+    "onCommand:ai-team.showRunDetails",
+    "onCommand:ai-team.refreshHistory",
+    "onView:aiTeamRuns"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ai-team.runPipeline",
+        "title": "AI Team: Run Pipeline",
+        "icon": "$(play)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.showHistory",
+        "title": "AI Team: Show Run History",
+        "icon": "$(history)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.openDashboard",
+        "title": "AI Team: Open Web Dashboard",
+        "icon": "$(browser)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.configure",
+        "title": "AI Team: Configure API Connection",
+        "icon": "$(settings-gear)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.cancelPipeline",
+        "title": "AI Team: Cancel Running Pipeline",
+        "icon": "$(stop-circle)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.showRunDetails",
+        "title": "AI Team: Show Run Details",
+        "icon": "$(eye)",
+        "category": "AI Software Team"
+      },
+      {
+        "command": "ai-team.refreshHistory",
+        "title": "Refresh",
+        "icon": "$(refresh)",
+        "category": "AI Software Team"
+      }
+    ],
+    "configuration": {
+      "title": "AI Software Engineering Team",
+      "properties": {
+        "aiTeam.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:3001",
+          "description": "Base URL of the AI Software Team server (e.g. http://localhost:3001 or https://ai-team.example.com)",
+          "scope": "window"
+        },
+        "aiTeam.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Optional API key for the AI Software Team server (if authentication is enabled)",
+          "scope": "window"
+        },
+        "aiTeam.autoOpenOutput": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically open the output channel when a pipeline run starts",
+          "scope": "window"
+        },
+        "aiTeam.downloadPath": {
+          "type": "string",
+          "default": "",
+          "description": "Default path to save downloaded project ZIPs. Leave empty to always prompt.",
+          "scope": "window"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aiTeamSidebar",
+          "title": "AI Software Team",
+          "icon": "$(circuit-board)"
+        }
+      ]
+    },
+    "views": {
+      "aiTeamSidebar": [
+        {
+          "id": "aiTeamRuns",
+          "name": "Pipeline Runs",
+          "icon": "$(circuit-board)",
+          "contextualTitle": "AI Software Team"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "ai-team.runPipeline",
+          "when": "view == aiTeamRuns",
+          "group": "navigation@1"
+        },
+        {
+          "command": "ai-team.refreshHistory",
+          "when": "view == aiTeamRuns",
+          "group": "navigation@2"
+        },
+        {
+          "command": "ai-team.openDashboard",
+          "when": "view == aiTeamRuns",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "ai-team.showRunDetails",
+          "when": "view == aiTeamRuns && viewItem == run",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {}
+}
