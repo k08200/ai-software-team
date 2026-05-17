@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { apiClient } from "../services/api.js";
+import { apiClient, api } from "../services/api.js";
 import type { User } from "../types/auth.js";
 
 // ---------------------------------------------------------------------------
@@ -58,11 +58,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.post<{ user: User; token: string }>(
-        "/auth/login",
-        { email, password },
-      );
-      const { user, token } = response.data;
+      const { user, token } = await api.auth.login(email, password);
       localStorage.setItem(TOKEN_KEY, token);
       setAxiosAuth(token);
       set({ user, token, isLoading: false, error: null });
@@ -76,11 +72,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   register: async (email, password) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await apiClient.post<{ user: User; token: string }>(
-        "/auth/register",
-        { email, password },
-      );
-      const { user, token } = response.data;
+      const { user, token } = await api.auth.register(email, password);
       localStorage.setItem(TOKEN_KEY, token);
       setAxiosAuth(token);
       set({ user, token, isLoading: false, error: null });
@@ -108,8 +100,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set) => ({
     setAxiosAuth(stored);
 
     try {
-      const response = await apiClient.get<User>("/auth/me");
-      set({ user: response.data, token: stored, isLoading: false });
+      const user = await api.auth.me();
+      set({ user, token: stored, isLoading: false });
     } catch {
       // Token is invalid/expired — clear it silently
       localStorage.removeItem(TOKEN_KEY);

@@ -15,6 +15,34 @@ interface SessionRecord {
   zipPath?: string;
 }
 
+// Server PublicUser shape (differs from client User type)
+interface PublicUser {
+  id: string;
+  email: string;
+  plan: "free" | "starter" | "pro" | "team" | "enterprise";
+  runCountCurrentPeriod: number;
+  [key: string]: unknown;
+}
+
+const PLAN_LIMITS: Record<string, number> = {
+  free: 3,
+  starter: 30,
+  pro: 150,
+  team: 500,
+  enterprise: -1,
+};
+
+function toUser(u: PublicUser): User {
+  const limit = PLAN_LIMITS[u.plan] ?? 3;
+  return {
+    id: u.id,
+    email: u.email,
+    plan: u.plan,
+    runsThisMonth: u.runCountCurrentPeriod ?? 0,
+    runsLimit: limit,
+  };
+}
+
 function toRun(s: SessionRecord): Run {
   return {
     id: s.sessionId,
@@ -98,27 +126,18 @@ apiClient.interceptors.response.use(
 export const api = {
   auth: {
     login: async (email: string, password: string): Promise<AuthResponse> => {
-      const response = await apiClient.post<AuthResponse>("/auth/login", {
-        email,
-        password,
-      });
-      return response.data;
+      const response = await apiClient.post<{ user: PublicUser; token: string }>("/auth/login", { email, password });
+      return { user: toUser(response.data.user), token: response.data.token };
     },
 
-    register: async (
-      email: string,
-      password: string,
-    ): Promise<AuthResponse> => {
-      const response = await apiClient.post<AuthResponse>("/auth/register", {
-        email,
-        password,
-      });
-      return response.data;
+    register: async (email: string, password: string): Promise<AuthResponse> => {
+      const response = await apiClient.post<{ user: PublicUser; token: string }>("/auth/register", { email, password });
+      return { user: toUser(response.data.user), token: response.data.token };
     },
 
     me: async (): Promise<User> => {
-      const response = await apiClient.get<User>("/auth/me");
-      return response.data;
+      const response = await apiClient.get<{ user: PublicUser }>("/auth/me");
+      return toUser(response.data.user);
     },
   },
 
