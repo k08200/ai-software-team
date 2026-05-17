@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-6}
+      - THINKING_BUDGET=${THINKING_BUDGET:-8000}
+      - MAX_ROUNDS=${MAX_ROUNDS:-3}
+      - MIN_ROUNDS=${MIN_ROUNDS:-3}
+      - NODE_ENV=production
+      - CLIENT_ORIGIN=http://localhost:3001
+    volumes:
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development mode: run server + client separately
+  server-dev:
+    profiles: ["dev"]
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && cd server && npx tsx watch src/index.ts"
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-6}
+      - CLIENT_ORIGIN=http://localhost:3000
+
+  client-dev:
+    profiles: ["dev"]
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && cd client && npx vite --host 0.0.0.0"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - server-dev

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-server:
+    name: Server Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check (server)
+        working-directory: server
+        run: npx tsc --noEmit
+
+      - name: Run server tests
+        working-directory: server
+        env:
+          ANTHROPIC_API_KEY: test-key-for-ci
+        run: npx vitest run
+
+  test-client:
+    name: Client Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check (client)
+        working-directory: client
+        run: npx tsc --noEmit
+
+      - name: Run client tests
+        working-directory: client
+        run: npx vitest run
+
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    needs: [test-server, test-client]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build server
+        working-directory: server
+        run: npx tsc
+
+      - name: Build client
+        working-directory: client
+        run: npx vite build

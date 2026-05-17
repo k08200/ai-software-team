@@ -5,6 +5,8 @@ import { AgentPanel } from "./components/AgentPanel.js";
 import { TokenCounter } from "./components/TokenCounter.js";
 import { RoundProgress } from "./components/RoundProgress.js";
 import { CompletionPanel } from "./components/CompletionPanel.js";
+import { CostEstimate } from "./components/CostEstimate.js";
+import { SessionHistory } from "./components/SessionHistory.js";
 import type { AgentId } from "./types/index.js";
 
 const ALL_AGENTS: AgentId[] = [
@@ -87,6 +89,10 @@ export function App() {
         {status === "idle" ? (
           <div className="mb-12">
             <IdeaInput />
+            <CostEstimate />
+            <div className="mt-8">
+              <SessionHistory />
+            </div>
           </div>
         ) : (
           <div className="mb-6">

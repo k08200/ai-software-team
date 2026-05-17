@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import fs from "fs";
 import { PipelineOrchestrator } from "../pipeline/orchestrator.js";
+import { estimateCost } from "../utils/cost-estimator.js";
+import { saveSession, getSessions, getSession } from "../utils/session-store.js";
 import type { SSEEvent } from "../types.js";
 
 const router = Router();
@@ -115,4 +117,44 @@ router.get("/status", (_req: Request, res: Response): void => {
   });
 });
 
+router.get("/estimate", (req: Request, res: Response): void => {
+  const model = (req.query.model as string) ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6";
+  const rounds = parseInt((req.query.rounds as string) ?? process.env.MAX_ROUNDS ?? "3", 10);
+
+  if (isNaN(rounds) || rounds < 1 || rounds > 10) {
+    res.status(400).json({ error: "rounds must be between 1 and 10" });
+    return;
+  }
+
+  const estimate = estimateCost(model, rounds);
+  res.json(estimate);
+});
+
+router.get("/sessions", async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const sessions = await getSessions();
+    res.json(sessions);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to read sessions" });
+  }
+});
+
+router.get("/sessions/:sessionId", async (req: Request, res: Response): Promise<void> => {
+  const { sessionId } = req.params;
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    res.status(400).json({ error: "Invalid session ID." });
+    return;
+  }
+
+  const session = await getSession(sessionId);
+  if (!session) {
+    res.status(404).json({ error: "Session not found." });
+    return;
+  }
+
+  res.json(session);
+});
+
+export { saveSession };
 export default router;

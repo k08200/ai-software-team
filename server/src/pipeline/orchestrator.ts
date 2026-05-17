@@ -1,8 +1,6 @@
-import type { Response } from "express";
 import type {
   PipelineContext,
   SSEEvent,
-  SSEEventType,
   AgentOutput,
   RoundResult,
 } from "../types.js";
@@ -16,6 +14,8 @@ import { ReviewAgent } from "../agents/review-agent.js";
 import { TokenTracker } from "../utils/token-tracker.js";
 import { FileManager } from "../utils/file-manager.js";
 import { countIssues } from "../utils/issue-extractor.js";
+import { estimateCost } from "../utils/cost-estimator.js";
+import { saveSession } from "../utils/session-store.js";
 
 const MAX_ROUNDS = parseInt(process.env.MAX_ROUNDS ?? "3", 10);
 const MIN_ROUNDS = parseInt(process.env.MIN_ROUNDS ?? "3", 10);
@@ -46,7 +46,26 @@ export class PipelineOrchestrator {
       startTime: Date.now(),
     };
 
-    emit({ type: "pipeline_start", data: { projectIdea, sessionId } });
+    // Emit cost estimate upfront so user knows what to expect
+    const costEstimate = estimateCost(
+      process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6",
+      MAX_ROUNDS,
+    );
+    emit({
+      type: "pipeline_start",
+      data: { projectIdea, sessionId, costEstimate },
+    });
+
+    // Save session as running
+    await saveSession({
+      sessionId,
+      projectIdea,
+      status: "running",
+      totalTokens: 0,
+      roundCount: 0,
+      finalIssues: 0,
+      startedAt: new Date().toISOString(),
+    });
 
     try {
       // Phase 1: CTO Agent
@@ -199,21 +218,52 @@ export class PipelineOrchestrator {
       // Save summary
       await this.saveSummary(fileManager, ctx);
 
+      const finalIssues = ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0;
+      const totalTokens = this.tokenTracker.getTotalTokens();
+      const duration = Date.now() - ctx.startTime;
+
+      // Persist completed session
+      await saveSession({
+        sessionId,
+        projectIdea,
+        status: "completed",
+        totalTokens,
+        roundCount: round,
+        finalIssues,
+        startedAt: new Date(ctx.startTime).toISOString(),
+        completedAt: new Date().toISOString(),
+        durationMs: duration,
+        zipPath: relativePath,
+      });
+
       emit({
         type: "pipeline_complete",
         data: {
-          totalTokens: this.tokenTracker.getTotalTokens(),
+          totalTokens,
           tokenSummary: this.tokenTracker.getSummary(),
           roundCount: round,
-          finalIssues: ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0,
+          finalIssues,
           zipPath: relativePath,
           sessionId,
-          duration: Date.now() - ctx.startTime,
+          duration,
         },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       emit({ type: "pipeline_error", data: { message } });
+
+      await saveSession({
+        sessionId,
+        projectIdea,
+        status: "error",
+        totalTokens: this.tokenTracker.getTotalTokens(),
+        roundCount: ctx.rounds.length,
+        finalIssues: 0,
+        startedAt: new Date(ctx.startTime).toISOString(),
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - ctx.startTime,
+      }).catch(() => {}); // Non-fatal
+
       throw error;
     }
   }
