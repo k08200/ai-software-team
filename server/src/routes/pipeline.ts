@@ -5,6 +5,9 @@ import fs from "fs";
 import { PipelineOrchestrator } from "../pipeline/orchestrator.js";
 import { estimateCost } from "../utils/cost-estimator.js";
 import { saveSession, getSessions, getSession } from "../utils/session-store.js";
+import { authRequired } from "../middleware/auth.js";
+import { checkRunQuota, incrementRunCount, QuotaExceededError } from "../services/user-service.js";
+import { enqueue } from "../services/queue-service.js";
 import type { SSEEvent } from "../types.js";
 
 const router = Router();
@@ -14,7 +17,12 @@ function sendSSE(res: Response, event: SSEEvent): void {
   res.write(`data: ${JSON.stringify(event.data)}\n\n`);
 }
 
-router.post("/run", async (req: Request, res: Response): Promise<void> => {
+router.post("/run", authRequired, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+
   const { idea } = req.body as { idea?: string };
 
   if (!idea || typeof idea !== "string" || idea.trim().length < 5) {
@@ -29,6 +37,25 @@ router.post("/run", async (req: Request, res: Response): Promise<void> => {
 
   const sessionId = uuidv4();
 
+  try {
+    await checkRunQuota(req.user.id);
+  } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      res.status(403).json({
+        success: false,
+        error: `Run quota exceeded for ${err.plan} plan.`,
+        plan: err.plan,
+        limit: err.limit,
+        current: err.current,
+      });
+      return;
+    }
+    const message = err instanceof Error ? err.message : "Failed to check quota";
+    console.error("[pipeline] quota check error:", message);
+    res.status(500).json({ success: false, error: "Failed to check run quota." });
+    return;
+  }
+
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -42,11 +69,19 @@ router.post("/run", async (req: Request, res: Response): Promise<void> => {
   }, 15000);
 
   const orchestrator = new PipelineOrchestrator();
+  const userId = req.user.id;
 
   try {
-    await orchestrator.run(idea.trim(), sessionId, (event) => {
-      sendSSE(res, event);
-    });
+    await enqueue(
+      sessionId,
+      idea.trim(),
+      userId,
+      (event) => sendSSE(res, event),
+      async (queuedIdea, queuedSessionId, queuedUserId, emit) => {
+        await orchestrator.run(queuedIdea, queuedSessionId, queuedUserId, emit);
+        await incrementRunCount(queuedUserId);
+      },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     sendSSE(res, { type: "pipeline_error", data: { message } });
@@ -130,16 +165,26 @@ router.get("/estimate", (req: Request, res: Response): void => {
   res.json(estimate);
 });
 
-router.get("/sessions", async (_req: Request, res: Response): Promise<void> => {
+router.get("/sessions", authRequired, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+
   try {
     const sessions = await getSessions();
-    res.json(sessions);
+    res.json(sessions.filter((session) => session.userId === req.user?.id));
   } catch (error) {
     res.status(500).json({ error: "Failed to read sessions" });
   }
 });
 
-router.get("/sessions/:sessionId", async (req: Request, res: Response): Promise<void> => {
+router.get("/sessions/:sessionId", authRequired, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+
   const { sessionId } = req.params;
 
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
@@ -149,6 +194,10 @@ router.get("/sessions/:sessionId", async (req: Request, res: Response): Promise<
 
   const session = await getSession(sessionId);
   if (!session) {
+    res.status(404).json({ error: "Session not found." });
+    return;
+  }
+  if (session.userId !== req.user.id) {
     res.status(404).json({ error: "Session not found." });
     return;
   }

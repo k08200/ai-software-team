@@ -34,6 +34,7 @@ export interface BillingPlan {
   price: number;
   runsPerMonth: number;
   features: string[];
+  priceId?: string | null;
 }
 
 export interface AuthResponse {

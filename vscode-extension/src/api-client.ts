@@ -63,7 +63,11 @@ function buildHeaders(apiKey: string): Record<string, string> {
     "Content-Type": "application/json",
   };
   if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
+    if (apiKey.startsWith("sk-ast-")) {
+      headers["x-api-key"] = apiKey;
+    } else {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
   }
   return headers;
 }

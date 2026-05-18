@@ -34,7 +34,10 @@ export function SessionHistory() {
 
   useEffect(() => {
     if (!isOpen) return;
-    fetch("/api/pipeline/sessions")
+    const token = localStorage.getItem("auth_token");
+    fetch("/api/pipeline/sessions", {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
       .then((r) => r.json())
       .then((data: Session[]) => setSessions(data))
       .catch(() => {});

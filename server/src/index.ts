@@ -9,6 +9,7 @@ import pipelineRouter from "./routes/pipeline.js";
 import authRouter from "./routes/auth.js";
 import apiKeysRouter from "./routes/api-keys.js";
 import billingRouter from "./routes/billing.js";
+import usersRouter from "./routes/users.js";
 import { scheduleCleanup } from "./utils/cleanup.js";
 
 const app = express();
@@ -62,6 +63,7 @@ app.use(generalLimiter);
 app.use("/api/auth", authLimiter, authRouter);
 app.use("/api/keys", apiKeysRouter);
 app.use("/api/billing", billingRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/pipeline", pipelineLimiter, pipelineRouter);
 
 // ── Static client (production) ───────────────────────────────────────────────

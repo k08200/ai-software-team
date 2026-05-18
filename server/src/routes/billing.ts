@@ -17,7 +17,10 @@ const router = Router();
 // ---------------------------------------------------------------------------
 
 const CheckoutSchema = z.object({
-  priceId: z.string().min(1, "priceId is required"),
+  priceId: z.string().min(1).optional(),
+  planId: z.enum(["starter", "pro", "team", "enterprise"]).optional(),
+}).refine((value) => value.priceId || value.planId, {
+  message: "priceId or planId is required",
 });
 
 // ---------------------------------------------------------------------------
@@ -130,15 +133,24 @@ router.post("/checkout", authRequired, async (req: Request, res: Response): Prom
     return;
   }
 
+  const requestedPriceId =
+    parsed.data.priceId ??
+    (parsed.data.planId ? PRICE_IDS[parsed.data.planId] : "");
+
+  if (!requestedPriceId) {
+    res.status(400).json({ success: false, error: "This plan is not configured for checkout." });
+    return;
+  }
+
   // Validate the priceId belongs to a known plan
   const knownPriceIds = Object.values(PRICE_IDS).filter(Boolean);
-  if (!knownPriceIds.includes(parsed.data.priceId)) {
+  if (!knownPriceIds.includes(requestedPriceId)) {
     res.status(400).json({ success: false, error: "Unknown price ID." });
     return;
   }
 
   try {
-    const url = await createCheckoutSession(req.user.id, parsed.data.priceId);
+    const url = await createCheckoutSession(req.user.id, requestedPriceId);
     res.status(200).json({ success: true, data: { url } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Checkout failed";

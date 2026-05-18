@@ -21,10 +21,14 @@ export function usePipeline() {
       abortControllerRef.current = new AbortController();
 
       try {
+        const token = localStorage.getItem("auth_token");
         // Use fetch with streaming for SSE (allows POST body)
         const response = await fetch(`${API_BASE}/run`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ idea }),
           signal: abortControllerRef.current.signal,
         });

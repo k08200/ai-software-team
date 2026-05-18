@@ -37,6 +37,7 @@ export class PipelineOrchestrator {
   async run(
     projectIdea: string,
     sessionId: string,
+    userId: string | undefined,
     emit: (event: SSEEvent) => void,
   ): Promise<void> {
     const fileManager = new FileManager(sessionId);
@@ -62,6 +63,7 @@ export class PipelineOrchestrator {
 
     await saveSession({
       sessionId,
+      userId,
       projectIdea,
       status: "running",
       totalTokens: 0,
@@ -256,10 +258,20 @@ export class PipelineOrchestrator {
       }
 
       // ─── Create ZIP ────────────────────────────────────────────────
-      // Save final code versions
+      // Save raw final responses and materialize markdown code blocks as files
       await Promise.all([
-        fileManager.saveFile("final-backend.ts", ctx.backendCode ?? ""),
-        fileManager.saveFile("final-frontend.tsx", ctx.frontendCode ?? ""),
+        fileManager.saveFile("final-backend.md", ctx.backendCode ?? ""),
+        fileManager.saveFile("final-frontend.md", ctx.frontendCode ?? ""),
+        fileManager.saveMarkdownCodeBlocksAsFiles(
+          ctx.backendCode ?? "",
+          "generated/backend",
+          "BACKEND_RESPONSE.md",
+        ),
+        fileManager.saveMarkdownCodeBlocksAsFiles(
+          ctx.frontendCode ?? "",
+          "generated/frontend",
+          "FRONTEND_RESPONSE.md",
+        ),
       ]);
 
       const zipPath = await fileManager.createZip();
@@ -273,6 +285,7 @@ export class PipelineOrchestrator {
 
       await saveSession({
         sessionId,
+        userId,
         projectIdea,
         status: "completed",
         totalTokens,
@@ -302,6 +315,7 @@ export class PipelineOrchestrator {
 
       await saveSession({
         sessionId,
+        userId,
         projectIdea,
         status: "error",
         totalTokens: this.tokenTracker.getTotalTokens(),

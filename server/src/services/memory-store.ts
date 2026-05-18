@@ -63,6 +63,29 @@ function sign(u: MemUser): string {
   );
 }
 
+function seedDemoUser(): void {
+  const email = "test@demo.com";
+  if (emailIndex.has(email)) return;
+
+  const id = newId();
+  const user: MemUser = {
+    id,
+    email,
+    passwordHash: bcrypt.hashSync("Test1234", config.auth.bcryptRounds),
+    plan: "enterprise",
+    emailVerified: true,
+    stripeCustomerId: null,
+    runCountCurrentPeriod: 0,
+    periodStart: new Date(),
+    createdAt: new Date(),
+  };
+
+  store.set(id, user);
+  emailIndex.set(email, id);
+}
+
+seedDemoUser();
+
 // ---------------------------------------------------------------------------
 // Operations — same signatures as user-service
 // ---------------------------------------------------------------------------
@@ -114,6 +137,29 @@ export function memGetUser(id: string): PublicUser {
   const user = store.get(id);
   if (!user) throw new UserNotFoundError(id);
   return toPublic(user);
+}
+
+export async function memChangePassword(
+  id: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const user = store.get(id);
+  if (!user) throw new UserNotFoundError(id);
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) throw new InvalidCredentialsError();
+
+  user.passwordHash = await bcrypt.hash(newPassword, config.auth.bcryptRounds);
+  store.set(id, user);
+}
+
+export function memDeleteUser(id: string): void {
+  const user = store.get(id);
+  if (!user) throw new UserNotFoundError(id);
+
+  store.delete(id);
+  emailIndex.delete(user.email);
 }
 
 export function memCheckRunQuota(_userId: string): boolean {

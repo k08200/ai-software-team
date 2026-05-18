@@ -6,3 +6,6 @@ outputs/
 coverage/
 *.zip
 .DS_Store
+client/playwright-report/
+client/test-results/
+vscode-extension/out/

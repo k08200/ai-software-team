@@ -210,13 +210,16 @@ export const api = {
   billing: {
     plans: async (): Promise<BillingPlan[]> => {
       const response = await apiClient.get<{ plans: ServerPlan[] }>("/billing/plans");
-      const serverPlans = (response.data as { plans: ServerPlan[] }).plans ?? [];
+      const serverPlans = Array.isArray(response.data)
+        ? response.data as unknown as ServerPlan[]
+        : (response.data as { plans: ServerPlan[] }).plans ?? [];
       return serverPlans.map((p) => ({
         id: p.id as BillingPlan["id"],
         name: p.name,
         price: p.priceUsd ?? 0,
         runsPerMonth: p.runsPerMonth ?? -1,
         features: [...p.features],
+        priceId: p.priceId,
       }));
     },
 

@@ -9,6 +9,8 @@ import {
   memRegister,
   memLogin,
   memGetUser,
+  memChangePassword,
+  memDeleteUser,
   memCheckRunQuota,
   memIncrementRunCount,
 } from "./memory-store.js";
@@ -202,6 +204,56 @@ export async function getUser(id: string): Promise<PublicUser> {
   }
 
   return toPublicUser(found);
+}
+
+// ---------------------------------------------------------------------------
+// changePassword
+// ---------------------------------------------------------------------------
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  if (USE_MEMORY) return memChangePassword(userId, currentPassword, newPassword);
+
+  const [found] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.isActive, true)))
+    .limit(1);
+
+  if (!found) {
+    throw new UserNotFoundError(userId);
+  }
+
+  const valid = await bcrypt.compare(currentPassword, found.passwordHash);
+  if (!valid) {
+    throw new InvalidCredentialsError();
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, config.auth.bcryptRounds);
+  await db
+    .update(users)
+    .set({ passwordHash })
+    .where(eq(users.id, userId));
+}
+
+// ---------------------------------------------------------------------------
+// deleteUser
+// ---------------------------------------------------------------------------
+
+export async function deleteUser(userId: string): Promise<void> {
+  if (USE_MEMORY) { memDeleteUser(userId); return; }
+
+  const deleted = await db
+    .delete(users)
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+
+  if (deleted.length === 0) {
+    throw new UserNotFoundError(userId);
+  }
 }
 
 // ---------------------------------------------------------------------------

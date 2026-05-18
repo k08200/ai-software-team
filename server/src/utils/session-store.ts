@@ -3,6 +3,7 @@ import path from "path";
 
 export interface SessionRecord {
   sessionId: string;
+  userId?: string;
   projectIdea: string;
   status: "running" | "completed" | "error";
   totalTokens: number;

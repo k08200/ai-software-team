@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: "http://localhost:3001",
         changeOrigin: true,
       },
     },
@@ -16,6 +16,7 @@ export default defineConfig({
     globals: true,
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
+    exclude: ["node_modules/**", "dist/**", "e2e/**", "playwright-report/**", "test-results/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

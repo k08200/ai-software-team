@@ -4,6 +4,7 @@ import {
   register,
   login,
   getUser,
+  changePassword,
   EmailAlreadyExistsError,
   InvalidCredentialsError,
   UserNotFoundError,
@@ -38,6 +39,16 @@ const LoginSchema = z.object({
     .email("Invalid email address")
     .transform((v) => v.toLowerCase().trim()),
   password: z.string().min(1, "Password is required"),
+});
+
+const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z
+    .string()
+    .min(8, "New password must be at least 8 characters")
+    .max(128, "New password must be under 128 characters")
+    .regex(/[A-Z]/, "New password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "New password must contain at least one digit"),
 });
 
 // ---------------------------------------------------------------------------
@@ -119,6 +130,49 @@ router.get("/me", authRequired, async (req: Request, res: Response): Promise<voi
     const message = err instanceof Error ? err.message : "Failed to fetch user";
     console.error("[auth] /me error:", message);
     res.status(500).json({ success: false, error: "Failed to fetch user profile." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /change-password
+// ---------------------------------------------------------------------------
+
+router.post("/change-password", authRequired, async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: "Authentication required." });
+    return;
+  }
+
+  const parsed = ChangePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Validation failed",
+      details: parsed.error.issues,
+    });
+    return;
+  }
+
+  try {
+    await changePassword(
+      req.user.id,
+      parsed.data.currentPassword,
+      parsed.data.newPassword,
+    );
+    res.status(200).json({ success: true, data: { message: "Password changed." } });
+  } catch (err) {
+    if (err instanceof InvalidCredentialsError) {
+      res.status(401).json({ success: false, error: "Current password is incorrect." });
+      return;
+    }
+    if (err instanceof UserNotFoundError) {
+      res.status(404).json({ success: false, error: "User not found." });
+      return;
+    }
+
+    const message = err instanceof Error ? err.message : "Password change failed";
+    console.error("[auth] change-password error:", message);
+    res.status(500).json({ success: false, error: "Failed to change password." });
   }
 });
 

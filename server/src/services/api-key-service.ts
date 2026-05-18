@@ -5,6 +5,7 @@ import { apiKeys, users } from "../db/schema.js";
 import type { ApiKey } from "../db/schema.js";
 import type { AuthUser } from "../middleware/auth.js";
 import { config } from "../config.js";
+import { memGetUser } from "./memory-store.js";
 
 const USE_MEMORY = !config.database.url;
 
@@ -208,13 +209,27 @@ export async function listKeys(userId: string): Promise<ApiKeyPublic[]> {
 // ---------------------------------------------------------------------------
 
 export async function validateKey(rawKey: string): Promise<AuthUser | null> {
-  if (USE_MEMORY) return null;   // No API keys in demo/file-based mode
-
   if (!rawKey.startsWith(KEY_PREFIX)) {
     return null;
   }
 
   const hash = crypto.createHash("sha256").update(rawKey).digest("hex");
+
+  if (USE_MEMORY) {
+    const record = Array.from(_memKeyStore.values()).find(
+      (key) => key.keyHash === hash && key.isActive
+    );
+    if (!record) return null;
+
+    try {
+      const user = memGetUser(record.userId);
+      record.lastUsedAt = new Date();
+      _memKeyStore.set(record.id, record);
+      return { id: user.id, email: user.email, plan: user.plan };
+    } catch {
+      return null;
+    }
+  }
 
   const [record] = await db
     .select({

@@ -38,8 +38,9 @@ COPY --from=builder /app/client/dist ./client/dist
 # Create outputs directory
 RUN mkdir -p outputs
 
-# Serve client static files from server
-COPY --from=builder /app/client/dist ./server/dist/public
+# Serve client static files from server. server/src/index.ts looks for
+# process.cwd()/public when NODE_ENV=production.
+COPY --from=builder /app/client/dist ./public
 
 EXPOSE 3001
 
