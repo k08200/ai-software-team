@@ -401,19 +401,19 @@ function ApiKeysTab() {
 // ---------------------------------------------------------------------------
 
 const PLAN_HIGHLIGHTS: Record<string, string[]> = {
-  free: ["10 runs/month", "Community support", "Basic models"],
-  starter: ["50 runs/month", "Email support", "All models"],
-  pro: ["500 runs/month", "Priority support", "Extended thinking"],
-  team: ["2000 runs/month", "Slack support", "Custom agents"],
+  free: ["3 runs/month", "Community support", "Basic models"],
+  starter: ["30 runs/month", "Email support", "All models"],
+  pro: ["150 runs/month", "Priority support", "Extended thinking"],
+  team: ["500 runs/month", "Slack support", "Custom agents"],
   enterprise: ["Unlimited runs", "Dedicated support", "SLA + SSO"],
 };
 
 const PLAN_PRICES: Record<string, number> = {
   free: 0,
-  starter: 9,
-  pro: 29,
-  team: 99,
-  enterprise: 499,
+  starter: 29,
+  pro: 99,
+  team: 299,
+  enterprise: 0, // custom pricing
 };
 
 function BillingTab() {
@@ -435,7 +435,7 @@ function BillingTab() {
               id,
               name: id.charAt(0).toUpperCase() + id.slice(1),
               price: PLAN_PRICES[id],
-              runsPerMonth: { free: 10, starter: 50, pro: 500, team: 2000, enterprise: -1 }[id],
+              runsPerMonth: { free: 3, starter: 30, pro: 150, team: 500, enterprise: -1 }[id],
               features: PLAN_HIGHLIGHTS[id],
             }),
           ),

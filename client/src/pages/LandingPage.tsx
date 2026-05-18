@@ -213,10 +213,10 @@ export function LandingPage() {
           </p>
           <div className="flex flex-wrap justify-center gap-4 mb-8">
             {[
-              { plan: "Free", price: "$0", runs: "10/mo" },
-              { plan: "Starter", price: "$9", runs: "50/mo" },
-              { plan: "Pro", price: "$29", runs: "500/mo", popular: true },
-              { plan: "Team", price: "$99", runs: "2000/mo" },
+              { plan: "Free", price: "$0", runs: "3/mo" },
+              { plan: "Starter", price: "$29", runs: "30/mo" },
+              { plan: "Pro", price: "$99", runs: "150/mo", popular: true },
+              { plan: "Team", price: "$299", runs: "500/mo" },
             ].map((p) => (
               <div
                 key={p.plan}
