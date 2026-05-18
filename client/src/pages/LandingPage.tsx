@@ -19,28 +19,28 @@ const FEATURES = [
   },
   {
     icon: <Code2 size={20} className="text-cyan-400" />,
-    title: "Production-Ready Code",
+    title: "Structured Project ZIP",
     description:
-      "Receive a fully structured, downloadable ZIP with frontend, backend, tests, and documentation.",
+      "Receive a downloadable ZIP with generated frontend/backend file trees, raw agent outputs, and a summary report.",
   },
   {
     icon: <Shield size={20} className="text-green-400" />,
-    title: "Built-in Quality Loops",
+    title: "Built-in Review Loops",
     description:
-      "QA and Security agents review output and trigger iterative fix rounds until issues are resolved.",
+      "QA, Security, and Review agents inspect output and trigger fix rounds before the final ZIP is prepared.",
   },
   {
     icon: <Users size={20} className="text-yellow-400" />,
-    title: "Extended Thinking",
+    title: "Verification Summary",
     description:
-      "Powered by Claude with extended thinking — agents reason deeply before writing a single line.",
+      "Each ZIP includes a SUMMARY.md with issue counts, token usage, generated file counts, and optional build/test results.",
   },
 ];
 
 const HOW_IT_WORKS = [
   { step: "01", label: "Describe Your Idea", desc: "One sentence is enough." },
   { step: "02", label: "Agents Collaborate", desc: "7 AI agents work in a pipeline." },
-  { step: "03", label: "Review & Download", desc: "Get your production ZIP." },
+  { step: "03", label: "Review & Download", desc: "Get a ZIP with generated files and verification notes." },
 ];
 
 export function LandingPage() {
@@ -97,8 +97,8 @@ export function LandingPage() {
 
         <p className="text-gray-400 text-lg max-w-xl mx-auto mb-10 leading-relaxed">
           Describe your product in one sentence. Our AI engineering team handles
-          architecture, code, tests, and security — delivering a production-ready
-          ZIP you can deploy immediately.
+          architecture, code, review, and security — delivering a structured ZIP
+          with generated files and a verification summary.
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">

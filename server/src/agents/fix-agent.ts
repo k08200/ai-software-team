@@ -20,7 +20,14 @@ Output format: One code block per file with path as header.
 ### src/filename.ts
 \`\`\`typescript
 // complete fixed code
-\`\`\``;
+\`\`\`
+
+STRICT FILE OUTPUT CONTRACT:
+- Return ONLY file sections in the format above.
+- Each file section MUST start with a markdown heading containing only the relative file path.
+- The code fence MUST immediately follow the file path heading.
+- Include package.json and every changed or required source/test file needed for a runnable project.
+- Do not include prose between files, summaries, or directory trees outside code blocks.`;
 
 const FRONTEND_FIX_PROMPT = `You are a Senior Frontend Engineer performing code fixes.
 
@@ -40,7 +47,14 @@ Output format: One code block per file with path as header.
 ### src/filename.tsx
 \`\`\`tsx
 // complete fixed code
-\`\`\``;
+\`\`\`
+
+STRICT FILE OUTPUT CONTRACT:
+- Return ONLY file sections in the format above.
+- Each file section MUST start with a markdown heading containing only the relative file path.
+- The code fence MUST immediately follow the file path heading.
+- Include package.json and every changed or required source/test file needed for a runnable project.
+- Do not include prose between files, summaries, or directory trees outside code blocks.`;
 
 export class BackendFixAgent extends BaseAgent {
   constructor() {

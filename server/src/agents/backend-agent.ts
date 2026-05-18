@@ -46,7 +46,16 @@ Example:
 ### src/index.ts
 \`\`\`typescript
 // complete code here
-\`\`\``;
+\`\`\`
+
+STRICT FILE OUTPUT CONTRACT:
+- Return ONLY file sections in the format above.
+- Each file section MUST start with a markdown heading containing only the relative file path, e.g. "### package.json" or "### src/index.ts".
+- The code fence MUST immediately follow the file path heading.
+- Include package.json, tsconfig.json, .env.example, README.md, and every source/test file needed to run the project.
+- Do not wrap multiple files in one code block.
+- Do not include prose between files, commentary, summaries, or directory trees outside code blocks.
+- Do not use absolute paths or parent directory paths.`;
 
 export class BackendAgent extends BaseAgent {
   constructor() {
@@ -71,6 +80,8 @@ ${prd}
 Implement the COMPLETE backend application.
 Write every file completely — no stubs, no TODOs.
 Include package.json, tsconfig.json, .env.example, and all source files.
-The code must be runnable with: npm install && npm run dev`;
+The code must be runnable with: npm install && npm run dev
+
+Remember the strict file output contract: one "### relative/path" heading followed immediately by one code block per file, no prose outside file sections.`;
   }
 }

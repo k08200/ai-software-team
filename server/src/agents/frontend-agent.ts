@@ -44,7 +44,16 @@ Output format: One markdown code block per file with file path as header.
 ### src/main.tsx
 \`\`\`tsx
 // complete code
-\`\`\``;
+\`\`\`
+
+STRICT FILE OUTPUT CONTRACT:
+- Return ONLY file sections in the format above.
+- Each file section MUST start with a markdown heading containing only the relative file path, e.g. "### package.json" or "### src/main.tsx".
+- The code fence MUST immediately follow the file path heading.
+- Include package.json, vite.config.ts, tailwind.config.js, postcss.config.js, index.html, README.md, and every source/test file needed to run the project.
+- Do not wrap multiple files in one code block.
+- Do not include prose between files, commentary, summaries, or directory trees outside code blocks.
+- Do not use absolute paths or parent directory paths.`;
 
 export class FrontendAgent extends BaseAgent {
   constructor() {
@@ -77,6 +86,8 @@ ${backendCode.substring(0, 8000)}...
 Implement the COMPLETE frontend application.
 Include package.json, vite.config.ts, tailwind.config.js, index.html, and all source files.
 The UI must be polished, production-ready, and match all user stories from the PRD.
-Must run with: npm install && npm run dev`;
+Must run with: npm install && npm run dev
+
+Remember the strict file output contract: one "### relative/path" heading followed immediately by one code block per file, no prose outside file sections.`;
   }
 }
