@@ -25,7 +25,7 @@ const CreateKeySchema = z.object({
 });
 
 const KeyIdParamSchema = z.object({
-  keyId: z.string().uuid("Invalid key ID format"),
+  keyId: z.string().min(1, "Key ID is required"),
 });
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,27 @@ interface SessionRecord {
   zipPath?: string;
 }
 
+// Server-side billing plan shape (priceUsd instead of price)
+interface ServerPlan {
+  id: string;
+  name: string;
+  priceUsd: number | null;
+  runsPerMonth: number | null;
+  features: readonly string[];
+  priceId: string | null;
+}
+
+// Server-side CreatedApiKey shape (returned once on key creation)
+interface CreatedApiKeyServer {
+  id: string;
+  name: string;
+  prefix: string;
+  isActive: boolean;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+  rawKey: string;
+}
+
 // Server PublicUser shape (differs from client User type)
 interface PublicUser {
   id: string;
@@ -157,16 +178,28 @@ export const api = {
 
   keys: {
     list: async (): Promise<ApiKey[]> => {
-      const response = await apiClient.get<ApiKey[]>("/keys");
-      return response.data;
+      const response = await apiClient.get<{ keys: ApiKey[] }>("/keys");
+      return (response.data as { keys: ApiKey[] }).keys ?? [];
     },
 
     create: async (name: string): Promise<{ key: string; apiKey: ApiKey }> => {
-      const response = await apiClient.post<{ key: string; apiKey: ApiKey }>(
+      const response = await apiClient.post<{ key: CreatedApiKeyServer; warning: string }>(
         "/keys",
         { name },
       );
-      return response.data;
+      const created = (response.data as { key: CreatedApiKeyServer }).key;
+      return {
+        key: created.rawKey,
+        apiKey: {
+          id: created.id,
+          name: created.name,
+          prefix: created.prefix,
+          createdAt: created.createdAt instanceof Date ? created.createdAt.toISOString() : String(created.createdAt),
+          lastUsedAt: created.lastUsedAt
+            ? (created.lastUsedAt instanceof Date ? created.lastUsedAt.toISOString() : String(created.lastUsedAt))
+            : null,
+        },
+      };
     },
 
     revoke: async (keyId: string): Promise<void> => {
@@ -176,8 +209,15 @@ export const api = {
 
   billing: {
     plans: async (): Promise<BillingPlan[]> => {
-      const response = await apiClient.get<BillingPlan[]>("/billing/plans");
-      return response.data;
+      const response = await apiClient.get<{ plans: ServerPlan[] }>("/billing/plans");
+      const serverPlans = (response.data as { plans: ServerPlan[] }).plans ?? [];
+      return serverPlans.map((p) => ({
+        id: p.id as BillingPlan["id"],
+        name: p.name,
+        price: p.priceUsd ?? 0,
+        runsPerMonth: p.runsPerMonth ?? -1,
+        features: [...p.features],
+      }));
     },
 
     checkout: async (planId: string): Promise<{ url: string }> => {

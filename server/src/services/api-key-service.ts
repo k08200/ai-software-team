@@ -9,6 +9,67 @@ import { config } from "../config.js";
 const USE_MEMORY = !config.database.url;
 
 // ---------------------------------------------------------------------------
+// In-memory key store (used when DATABASE_URL is not set)
+// ---------------------------------------------------------------------------
+
+interface MemApiKey {
+  id: string;
+  userId: string;
+  name: string;
+  keyHash: string;
+  keyPrefix: string;
+  isActive: boolean;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+}
+
+let _memKeyCounter = 1;
+const _memKeyStore = new Map<string, MemApiKey>();
+
+function _memNewId(): string {
+  return `mem-key-${_memKeyCounter++}`;
+}
+
+function _memListKeys(userId: string): ApiKeyPublic[] {
+  return Array.from(_memKeyStore.values())
+    .filter((k) => k.userId === userId && k.isActive)
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .map((k) => ({
+      id: k.id,
+      name: k.name,
+      prefix: k.keyPrefix,
+      isActive: k.isActive,
+      lastUsedAt: k.lastUsedAt,
+      createdAt: k.createdAt,
+    }));
+}
+
+function _memCreateKey(userId: string, name: string): CreatedApiKey {
+  const { key, hash, prefix } = generateKey();
+  const id = _memNewId();
+  const record: MemApiKey = {
+    id,
+    userId,
+    name,
+    keyHash: hash,
+    keyPrefix: prefix,
+    isActive: true,
+    lastUsedAt: null,
+    createdAt: new Date(),
+  };
+  _memKeyStore.set(id, record);
+  return { id, name, prefix, isActive: true, lastUsedAt: null, createdAt: record.createdAt, rawKey: key };
+}
+
+function _memRevokeKey(keyId: string, userId: string): void {
+  const record = _memKeyStore.get(keyId);
+  if (!record || record.userId !== userId) {
+    throw new Error("API key not found or you do not own it.");
+  }
+  _memKeyStore.set(keyId, { ...record, isActive: false });
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -64,6 +125,8 @@ export async function createKey(
   userId: string,
   name: string
 ): Promise<CreatedApiKey> {
+  if (USE_MEMORY) return _memCreateKey(userId, name);
+
   const { key, hash, prefix } = generateKey();
 
   const [record] = await db
@@ -97,6 +160,8 @@ export async function createKey(
 // ---------------------------------------------------------------------------
 
 export async function revokeKey(keyId: string, userId: string): Promise<void> {
+  if (USE_MEMORY) { _memRevokeKey(keyId, userId); return; }
+
   const result = await db
     .update(apiKeys)
     .set({ isActive: false })
@@ -113,6 +178,8 @@ export async function revokeKey(keyId: string, userId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function listKeys(userId: string): Promise<ApiKeyPublic[]> {
+  if (USE_MEMORY) return _memListKeys(userId);
+
   const records = await db
     .select({
       id: apiKeys.id,
