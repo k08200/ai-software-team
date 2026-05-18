@@ -7,6 +7,9 @@ services:
       - "3001:3001"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:14b}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-6}
       - THINKING_BUDGET=${THINKING_BUDGET:-8000}
       - MAX_ROUNDS=${MAX_ROUNDS:-3}
@@ -35,6 +38,9 @@ services:
       - /app/node_modules
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:14b}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-opus-4-6}
       - CLIENT_ORIGIN=http://localhost:3000
 

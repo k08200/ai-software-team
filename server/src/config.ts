@@ -28,13 +28,25 @@ export const config = {
 
   demoMode: optional("DEMO_MODE", "false") === "true",
 
+  llm: {
+    provider: optional("LLM_PROVIDER", "ollama") as "ollama" | "anthropic",
+    model: optional("LLM_PROVIDER", "ollama") === "anthropic"
+      ? optional("ANTHROPIC_MODEL", "claude-opus-4-6")
+      : optional("OLLAMA_MODEL", "qwen2.5-coder:14b"),
+  },
+
   anthropic: {
-    // In demo mode the API key is not used — skip the required() check
-    apiKey: optional("DEMO_MODE", "false") === "true"
+    // In demo/Ollama mode the API key is not used — skip the required() check
+    apiKey: optional("DEMO_MODE", "false") === "true" || optional("LLM_PROVIDER", "ollama") !== "anthropic"
       ? optional("ANTHROPIC_API_KEY", "demo-key")
       : required("ANTHROPIC_API_KEY"),
     model: optional("ANTHROPIC_MODEL", "claude-opus-4-6"),
     thinkingBudget: optionalInt("THINKING_BUDGET", 8000),
+  },
+
+  ollama: {
+    baseUrl: optional("OLLAMA_BASE_URL", "http://localhost:11434"),
+    model: optional("OLLAMA_MODEL", "qwen2.5-coder:14b"),
   },
 
   pipeline: {

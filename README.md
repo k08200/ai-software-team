@@ -57,7 +57,7 @@ Agent Pipeline:
 
 ### 1. 사전 요구사항
 - Node.js 20+
-- Anthropic API Key
+- Ollama (기본 무료 로컬 모델 실행)
 
 ### 2. 설치
 
@@ -72,11 +72,27 @@ npm install
 
 ```bash
 cp .env.example server/.env
-# server/.env 파일에서 ANTHROPIC_API_KEY 설정
+# 기본값은 Ollama 로컬 provider입니다.
 ```
 
 ```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5-coder:14b
+```
+
+Ollama에 모델이 없다면 먼저 설치합니다.
+
+```bash
+ollama pull qwen2.5-coder:14b
+```
+
+유료 cloud provider를 쓰고 싶을 때만 Anthropic 설정을 사용합니다.
+
+```env
+LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=your_api_key_here
+ANTHROPIC_MODEL=claude-opus-4-6
 ```
 
 ### 4. 실행
@@ -111,8 +127,11 @@ npm run dev
 
 | 변수 | 기본값 | 설명 |
 |-----|--------|-----|
-| `ANTHROPIC_API_KEY` | 필수 | Anthropic API 키 |
-| `ANTHROPIC_MODEL` | `claude-opus-4-6` | 사용할 Claude 모델 |
+| `LLM_PROVIDER` | `ollama` | 사용할 LLM provider (`ollama` 또는 `anthropic`) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 로컬 API URL |
+| `OLLAMA_MODEL` | `qwen2.5-coder:14b` | 사용할 Ollama 모델 |
+| `ANTHROPIC_API_KEY` | 선택 | `LLM_PROVIDER=anthropic`일 때 필요한 Anthropic API 키 |
+| `ANTHROPIC_MODEL` | `claude-opus-4-6` | Anthropic provider에서 사용할 Claude 모델 |
 | `THINKING_BUDGET` | `8000` | Extended thinking 토큰 예산 |
 | `MAX_ROUNDS` | `3` | 최대 반복 라운드 수 |
 | `MIN_ROUNDS` | `3` | 최소 반복 라운드 수 |
@@ -172,8 +191,8 @@ curl http://localhost:3001/health
 **Backend**
 - Node.js 20 + TypeScript 5
 - Express 4 (SSE streaming)
-- @anthropic-ai/sdk (latest)
-- Extended Thinking 활성화
+- Ollama local-first provider
+- Optional Anthropic provider via @anthropic-ai/sdk
 
 **Frontend**
 - React 18 + TypeScript
@@ -187,8 +206,14 @@ curl http://localhost:3001/health
 - @testing-library/react (component tests)
 - 80%+ coverage target
 
+## Provider 전략
+
+- 기본값은 `LLM_PROVIDER=ollama`입니다. 투자 전/로컬 개발 단계에서 API 비용 없이 실행할 수 있습니다.
+- SaaS 운영 전까지는 BYOK(Bring Your Own Key) 또는 local-first 전략을 권장합니다.
+- Anthropic은 선택 provider입니다. `LLM_PROVIDER=anthropic`일 때만 `ANTHROPIC_API_KEY`가 필요합니다.
+
 ## 주의사항
 
 - `claude-opus-4-7`은 현재 존재하지 않습니다. 사용 가능한 최신 Opus 모델(`claude-opus-4-6`)을 사용합니다. `ANTHROPIC_MODEL` 환경변수로 변경 가능합니다.
-- 각 에이전트 호출 시 Extended Thinking이 활성화됩니다 (`thinking: { type: "enabled" }`).
-- 전체 파이프라인 실행에 상당한 API 토큰이 소비됩니다 (약 50,000~200,000 토큰).
+- Anthropic provider 사용 시 각 에이전트 호출에서 Extended Thinking이 활성화됩니다 (`thinking: { type: "enabled" }`).
+- 전체 파이프라인 실행에 상당한 토큰이 사용됩니다 (약 50,000~200,000 토큰). Ollama는 무료지만 로컬 CPU/GPU 시간이 오래 걸릴 수 있습니다.

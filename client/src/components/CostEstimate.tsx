@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 
 interface EstimateData {
+  provider?: string;
   model: string;
   minCostUSD: number;
   maxCostUSD: number;
@@ -35,7 +36,9 @@ export function CostEstimate() {
         <span>💰</span>
         예상 비용:
         <span className="text-gray-400 font-medium">
-          {fmt(estimate.minCostUSD)} ~ {fmt(estimate.maxCostUSD)}
+          {estimate.provider === "ollama"
+            ? "로컬 실행 무료"
+            : `${fmt(estimate.minCostUSD)} ~ ${fmt(estimate.maxCostUSD)}`}
         </span>
       </span>
       <span className="text-gray-700">·</span>

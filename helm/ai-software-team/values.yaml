@@ -120,6 +120,9 @@ env:
   PORT: "3001"
 
   # Anthropic model to use (override if needed)
+  LLM_PROVIDER: "ollama"
+  OLLAMA_BASE_URL: "http://ollama:11434"
+  OLLAMA_MODEL: "qwen2.5-coder:14b"
   ANTHROPIC_MODEL: "claude-opus-4-6"
 
   # Max improvement rounds per pipeline run (1–10)

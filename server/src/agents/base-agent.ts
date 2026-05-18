@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentConfig, AgentOutput, AgentId } from "../types.js";
+import { config as appConfig } from "../config.js";
 import { getDemoThinking, getDemoResponse, type DemoAgentId } from "../utils/demo-data.js";
 
 export type StreamCallback = (event: {
@@ -9,9 +10,10 @@ export type StreamCallback = (event: {
   outputTokens?: number;
 }) => void;
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6";
+const MODEL = appConfig.llm.model;
 const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET ?? "8000", 10);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
+const LLM_PROVIDER = appConfig.llm.provider;
 
 // Fake token counts for demo — realistic-looking numbers
 const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
@@ -27,13 +29,15 @@ const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
 };
 
 export abstract class BaseAgent {
-  protected client: Anthropic;
+  protected client?: Anthropic;
   readonly config: AgentConfig;
 
   constructor(config: Omit<AgentConfig, "model" | "thinkingBudget"> & { model?: string; thinkingBudget?: number }) {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY ?? "demo-key",
-    });
+    if (LLM_PROVIDER === "anthropic") {
+      this.client = new Anthropic({
+        apiKey: appConfig.anthropic.apiKey,
+      });
+    }
     this.config = {
       ...config,
       model: config.model ?? MODEL,
@@ -49,7 +53,10 @@ export abstract class BaseAgent {
     if (DEMO_MODE) {
       return this.runDemo(onStream, round);
     }
-    return this.runLive(userMessage, onStream);
+    if (LLM_PROVIDER === "ollama") {
+      return this.runOllama(userMessage, onStream);
+    }
+    return this.runAnthropic(userMessage, onStream);
   }
 
   // ── Demo mode: stream pre-written responses with realistic delays ──────
@@ -95,7 +102,7 @@ export abstract class BaseAgent {
   }
 
   // ── Live mode: call Claude API ─────────────────────────────────────────
-  private async runLive(userMessage: string, onStream: StreamCallback): Promise<AgentOutput> {
+  private async runAnthropic(userMessage: string, onStream: StreamCallback): Promise<AgentOutput> {
     const startTime = Date.now();
     let fullText = "";
     let thinkingText = "";
@@ -103,6 +110,8 @@ export abstract class BaseAgent {
     let outputTokens = 0;
 
     try {
+      if (!this.client) throw new Error("Anthropic client not initialized.");
+
       const stream = await this.client.messages.stream({
         model: this.config.model,
         max_tokens: this.config.maxTokens,
@@ -152,10 +161,106 @@ export abstract class BaseAgent {
       throw new Error(`[${this.config.agentName}] API error: ${message}`);
     }
   }
+
+  // ── Live mode: call local Ollama API ───────────────────────────────────
+  private async runOllama(userMessage: string, onStream: StreamCallback): Promise<AgentOutput> {
+    const startTime = Date.now();
+    let fullText = "";
+    let inputTokens = 0;
+    let outputTokens = 0;
+
+    try {
+      const response = await fetch(`${appConfig.ollama.baseUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: this.config.model,
+          stream: true,
+          messages: [
+            { role: "system", content: this.config.systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          options: {
+            num_predict: this.config.maxTokens,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(`Ollama HTTP ${response.status}${body ? `: ${body}` : ""}`);
+      }
+      if (!response.body) {
+        throw new Error("Ollama response body is empty.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          const event = JSON.parse(trimmed) as {
+            message?: { content?: string };
+            done?: boolean;
+            prompt_eval_count?: number;
+            eval_count?: number;
+            error?: string;
+          };
+
+          if (event.error) throw new Error(event.error);
+
+          const content = event.message?.content ?? "";
+          if (content) {
+            fullText += content;
+            onStream({ type: "text", content });
+          }
+
+          if (event.done) {
+            inputTokens = event.prompt_eval_count ?? estimateTokenCount(this.config.systemPrompt + userMessage);
+            outputTokens = event.eval_count ?? estimateTokenCount(fullText);
+          }
+        }
+      }
+
+      if (inputTokens === 0) inputTokens = estimateTokenCount(this.config.systemPrompt + userMessage);
+      if (outputTokens === 0) outputTokens = estimateTokenCount(fullText);
+
+      onStream({ type: "complete", content: fullText, inputTokens, outputTokens });
+
+      return {
+        agentId: this.config.agentId,
+        agentName: this.config.agentName,
+        content: fullText,
+        tokensUsed: inputTokens + outputTokens,
+        inputTokens,
+        outputTokens,
+        duration: Date.now() - startTime,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`[${this.config.agentName}] Ollama error: ${message}`);
+    }
+  }
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function estimateTokenCount(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
 }
 
 export function getAgentColor(agentId: AgentId): string {

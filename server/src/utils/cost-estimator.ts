@@ -47,6 +47,7 @@ const AGENT_TOKEN_ESTIMATES: Record<string, { input: number; output: number }> =
 };
 
 export interface CostEstimate {
+  provider: string;
   model: string;
   minTokens: number;
   maxTokens: number;
@@ -60,7 +61,23 @@ export interface CostEstimate {
 export function estimateCost(
   model: string = "claude-opus-4-6",
   rounds: number = 3,
+  provider: string = "anthropic",
 ): CostEstimate {
+  if (provider === "ollama") {
+    const totalTokens = estimateTotalTokens(rounds);
+    return {
+      provider,
+      model,
+      minTokens: Math.round(totalTokens * 0.6),
+      maxTokens: Math.round(totalTokens * 1.5),
+      minCostUSD: 0,
+      maxCostUSD: 0,
+      perRoundCostUSD: 0,
+      roundCount: rounds,
+      breakdown: buildZeroCostBreakdown(),
+    };
+  }
+
   const pricing = PRICING[model] ?? PRICING["claude-opus-4-6"];
 
   const breakdown: Record<string, { tokens: number; costUSD: number }> = {};
@@ -93,6 +110,7 @@ export function estimateCost(
   const totalCost = baseCost + roundCost * rounds;
 
   return {
+    provider,
     model,
     minTokens: Math.round(totalTokens * 0.6),
     maxTokens: Math.round(totalTokens * 1.5),
@@ -102,6 +120,27 @@ export function estimateCost(
     roundCount: rounds,
     breakdown,
   };
+}
+
+function estimateTotalTokens(rounds: number): number {
+  const baseTokens = ["cto", "pm", "backend", "frontend"].reduce((sum, agent) => {
+    const est = AGENT_TOKEN_ESTIMATES[agent];
+    return sum + est.input + est.output;
+  }, 0);
+  const roundTokens = ["qa", "security", "review"].reduce((sum, agent) => {
+    const est = AGENT_TOKEN_ESTIMATES[agent];
+    return sum + est.input + est.output;
+  }, 0);
+  return baseTokens + roundTokens * rounds;
+}
+
+function buildZeroCostBreakdown(): Record<string, { tokens: number; costUSD: number }> {
+  return Object.fromEntries(
+    Object.entries(AGENT_TOKEN_ESTIMATES).map(([agent, est]) => [
+      agent,
+      { tokens: est.input + est.output, costUSD: 0 },
+    ]),
+  );
 }
 
 export function formatCost(usd: number): string {

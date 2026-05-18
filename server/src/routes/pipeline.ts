@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { PipelineOrchestrator } from "../pipeline/orchestrator.js";
 import { estimateCost } from "../utils/cost-estimator.js";
+import { config } from "../config.js";
 import { saveSession, getSessions, getSession } from "../utils/session-store.js";
 import { authRequired } from "../middleware/auth.js";
 import { checkRunQuota, incrementRunCount, QuotaExceededError } from "../services/user-service.js";
@@ -146,14 +147,16 @@ router.get("/preview/:sessionId/:filename", (req: Request, res: Response): void 
 router.get("/status", (_req: Request, res: Response): void => {
   res.json({
     status: "ok",
-    model: process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6",
+    provider: config.llm.provider,
+    model: config.llm.model,
     maxRounds: parseInt(process.env.MAX_ROUNDS ?? "3", 10),
     timestamp: new Date().toISOString(),
   });
 });
 
 router.get("/estimate", (req: Request, res: Response): void => {
-  const model = (req.query.model as string) ?? process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6";
+  const provider = (req.query.provider as string) ?? config.llm.provider;
+  const model = (req.query.model as string) ?? config.llm.model;
   const rounds = parseInt((req.query.rounds as string) ?? process.env.MAX_ROUNDS ?? "3", 10);
 
   if (isNaN(rounds) || rounds < 1 || rounds > 10) {
@@ -161,7 +164,7 @@ router.get("/estimate", (req: Request, res: Response): void => {
     return;
   }
 
-  const estimate = estimateCost(model, rounds);
+  const estimate = estimateCost(model, rounds, provider);
   res.json(estimate);
 });
 

@@ -17,6 +17,7 @@ import { FileManager } from "../utils/file-manager.js";
 import { countIssues } from "../utils/issue-extractor.js";
 import { estimateCost } from "../utils/cost-estimator.js";
 import { saveSession } from "../utils/session-store.js";
+import { config } from "../config.js";
 import {
   formatVerificationReport,
   verifyGeneratedProjects,
@@ -58,8 +59,9 @@ export class PipelineOrchestrator {
 
     // Emit cost estimate upfront
     const costEstimate = estimateCost(
-      process.env.ANTHROPIC_MODEL ?? "claude-opus-4-6",
+      config.llm.model,
       MAX_ROUNDS,
+      config.llm.provider,
     );
     emit({
       type: "pipeline_start",
