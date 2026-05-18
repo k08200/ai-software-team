@@ -66,6 +66,16 @@ app.use("/api/billing", billingRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/pipeline", pipelineLimiter, pipelineRouter);
 
+// ── Health check ─────────────────────────────────────────────────────────────
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    version: "2.0.0",
+    model: config.anthropic.model,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // ── Static client (production) ───────────────────────────────────────────────
 if (config.nodeEnv === "production") {
   const clientDist = path.join(process.cwd(), "public");
@@ -76,16 +86,6 @@ if (config.nodeEnv === "production") {
     });
   }
 }
-
-// ── Health check ─────────────────────────────────────────────────────────────
-app.get("/health", (_req, res) => {
-  res.json({
-    status: "ok",
-    version: "2.0.0",
-    model: config.anthropic.model,
-    timestamp: new Date().toISOString(),
-  });
-});
 
 // ── 404 ──────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -17,6 +17,11 @@ import { FileManager } from "../utils/file-manager.js";
 import { countIssues } from "../utils/issue-extractor.js";
 import { estimateCost } from "../utils/cost-estimator.js";
 import { saveSession } from "../utils/session-store.js";
+import {
+  formatVerificationReport,
+  verifyGeneratedProjects,
+  type ProjectVerification,
+} from "../utils/project-verifier.js";
 import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = parseInt(process.env.MAX_ROUNDS ?? "3", 10);
@@ -274,14 +279,14 @@ export class PipelineOrchestrator {
         ),
       ]);
 
-      const zipPath = await fileManager.createZip();
-      const relativePath = zipPath.replace(process.cwd(), "");
-
-      await this.saveSummary(fileManager, ctx);
+      const verification = await verifyGeneratedProjects(fileManager.getOutputDir());
+      await this.saveSummary(fileManager, ctx, verification);
 
       const finalIssues = ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0;
       const totalTokens = this.tokenTracker.getTotalTokens();
       const duration = Date.now() - ctx.startTime;
+      const zipPath = await fileManager.createZip();
+      const relativePath = zipPath.replace(process.cwd(), "");
 
       await saveSession({
         sessionId,
@@ -424,6 +429,7 @@ export class PipelineOrchestrator {
   private async saveSummary(
     fileManager: FileManager,
     ctx: PipelineContext,
+    verification: ProjectVerification[],
   ): Promise<void> {
     const roundSummary = ctx.rounds
       .map((r) => `Round ${r.round}: ${r.issues.total} issues (QA: ${r.issues.qa.length}, Security: ${r.issues.security.length}, Review: ${r.issues.review.length})`)
@@ -446,6 +452,8 @@ ${Object.entries(this.tokenTracker.getSummary())
 
 ## Iteration Rounds
 ${roundSummary}
+
+${formatVerificationReport(verification)}
 
 ## Generated At
 ${new Date().toISOString()}

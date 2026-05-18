@@ -117,6 +117,8 @@ npm run dev
 | `MAX_ROUNDS` | `3` | 최대 반복 라운드 수 |
 | `MIN_ROUNDS` | `3` | 최소 반복 라운드 수 |
 | `PORT` | `3001` | 서버 포트 |
+| `VERIFY_GENERATED_PROJECTS` | `false` | 생성된 프로젝트에서 `npm install`, `npm run build`, `npm test`를 실행할지 여부 |
+| `VERIFY_TIMEOUT_MS` | `120000` | 생성 프로젝트 검증 명령별 타임아웃 |
 
 ## 테스트
 
@@ -126,6 +128,43 @@ make test
 
 # 커버리지 포함
 make test-coverage
+
+# 브라우저 E2E 테스트
+npm run test:e2e
+```
+
+`npm run test:e2e`는 서버를 먼저 빌드한 뒤 `DEMO_MODE=true`로 서버와 Vite 앱을 띄워 Dashboard/Settings 흐름을 Playwright로 검증합니다.
+
+## 생성 결과 검증
+
+파이프라인은 최종 에이전트 응답을 ZIP에 저장할 때:
+
+- 원본 응답: `final-backend.md`, `final-frontend.md`
+- 파일트리: `generated/backend`, `generated/frontend`
+- 검증 요약: `SUMMARY.md`
+
+를 포함합니다. 에이전트가 파일별 markdown code block을 반환하면 실제 파일로 펼쳐 저장하고, 그렇지 않으면 fallback 응답 파일로 저장합니다.
+
+기본값에서는 생성된 코드를 실행하지 않고 파일 수와 `package.json` 존재 여부만 요약합니다. 실제 생성 프로젝트에서 `npm install`, `npm run build`, `npm test`까지 실행하려면 서버 환경 변수에 아래 값을 설정하세요.
+
+```env
+VERIFY_GENERATED_PROJECTS=true
+```
+
+## Docker
+
+```bash
+# 프로덕션 이미지 빌드
+docker build -t ai-software-team:latest .
+
+# 데모 모드로 실행
+docker run --rm -p 3001:3001 \
+  -e DEMO_MODE=true \
+  -e JWT_SECRET=change-me \
+  ai-software-team:latest
+
+# Health check
+curl http://localhost:3001/health
 ```
 
 ## 기술 스택
