@@ -12,6 +12,7 @@
     "test": "npm run test --workspace=server && npm run test --workspace=client",
     "test:e2e": "npm run build --workspace=server && npm run test:e2e --workspace=client",
     "smoke:ollama": "npm run build --workspace=server && npm run smoke:ollama --workspace=server",
+    "smoke:ollama:verify": "npm run build --workspace=server && npm run smoke:ollama:verify --workspace=server",
     "install:all": "npm install"
   },
   "devDependencies": {

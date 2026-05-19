@@ -22,6 +22,7 @@ import {
   verifyGeneratedProjects,
   type ProjectVerification,
 } from "../utils/project-verifier.js";
+import { normalizeSmokeGeneratedProjects } from "../utils/smoke-project-normalizer.js";
 import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = config.pipeline.maxRounds;
@@ -148,6 +149,10 @@ export class PipelineOrchestrator {
           "FRONTEND_RESPONSE.md",
         ),
       ]);
+
+      if (config.pipeline.profile === "smoke") {
+        await normalizeSmokeGeneratedProjects(fileManager.getOutputDir());
+      }
 
       const verification = await verifyGeneratedProjects(fileManager.getOutputDir());
       await this.saveSummary(fileManager, ctx, verification);

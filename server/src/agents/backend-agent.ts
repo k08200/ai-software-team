@@ -84,6 +84,12 @@ Requirements:
 - Use Express + TypeScript.
 - Use in-memory storage only.
 - Implement only: GET /health, GET /memos, POST /memos, PUT /memos/:id, DELETE /memos/:id.
+- package.json must include scripts: "build": "tsc", "start": "node dist/index.js", "dev": "tsx src/index.ts".
+- package.json dependencies must include exactly "express": "^4.19.2".
+- package.json devDependencies must include exactly "typescript": "^5.4.5", "tsx": "^4.15.6", "@types/express": "^4.17.21", "@types/node": "^20.14.0".
+- tsconfig.json must set "rootDir": "src", "outDir": "dist", "module": "CommonJS", "target": "ES2022", "esModuleInterop": true, and "strict": true.
+- Do not import packages that are not listed in package.json.
+- Use a simple incrementing number id; do not import uuid.
 - Do not add comments or extra architecture layers.
 - Keep each file concise enough to fit in this response.
 - Follow the strict file output contract: each heading immediately followed by one code block.`;

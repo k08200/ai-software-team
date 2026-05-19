@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 import { spawn } from "child_process";
 
 interface PackageJson {
@@ -71,9 +72,9 @@ async function verifyProject(
   name: string,
   relativePath: string,
 ): Promise<ProjectVerification> {
-  const cwd = path.join(outputDir, relativePath);
-  const fileCount = await countFiles(cwd);
-  const packageJsonPath = path.join(cwd, "package.json");
+  const sourceCwd = path.join(outputDir, relativePath);
+  const fileCount = await countFiles(sourceCwd);
+  const packageJsonPath = path.join(sourceCwd, "package.json");
   const packageJson = await readPackageJson(packageJsonPath);
 
   const commands: VerificationCommand[] = [];
@@ -86,17 +87,30 @@ async function verifyProject(
     commands.push(skip("npm run build", "set VERIFY_GENERATED_PROJECTS=true to execute generated code"));
     commands.push(skip("npm test", "set VERIFY_GENERATED_PROJECTS=true to execute generated code"));
   } else {
-    commands.push(await runCommand("npm install", ["install", "--package-lock=false", "--no-audit", "--no-fund"], cwd));
-    if (packageJson.scripts?.["build"]) {
-      commands.push(await runCommand("npm run build", ["run", "build"], cwd));
-    } else {
-      commands.push(skip("npm run build", "build script not found"));
-    }
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "ast-generated-verify-"));
+    const verifyCwd = path.join(tempRoot, relativePath);
+    try {
+      await fs.mkdir(path.dirname(verifyCwd), { recursive: true });
+      await fs.cp(sourceCwd, verifyCwd, { recursive: true });
 
-    if (packageJson.scripts?.["test"]) {
-      commands.push(await runCommand("npm test", ["test"], cwd));
-    } else {
-      commands.push(skip("npm test", "test script not found"));
+      const install = await runCommand("npm install", ["install", "--package-lock=false", "--no-audit", "--no-fund"], verifyCwd);
+      commands.push(install);
+      if (install.status !== "passed") {
+        commands.push(skip("npm run build", "npm install failed"));
+        commands.push(skip("npm test", "npm install failed"));
+      } else if (packageJson.scripts?.["build"]) {
+        commands.push(await runCommand("npm run build", ["run", "build"], verifyCwd));
+        if (packageJson.scripts?.["test"]) {
+          commands.push(await runCommand("npm test", ["test"], verifyCwd));
+        } else {
+          commands.push(skip("npm test", "test script not found"));
+        }
+      } else {
+        commands.push(skip("npm run build", "build script not found"));
+        commands.push(skip("npm test", "build script not found"));
+      }
+    } finally {
+      await fs.rm(tempRoot, { recursive: true, force: true });
     }
   }
 

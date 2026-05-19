@@ -88,6 +88,11 @@ Requirements:
 - Use React 18 + TypeScript + Vite.
 - Implement a single-page memo UI with create and delete behavior.
 - Use local component state; do not add routing or extra libraries.
+- package.json must include scripts: "dev": "vite", "build": "vite build", "preview": "vite preview".
+- package.json dependencies must include exactly "react": "^18.2.0", "react-dom": "^18.2.0".
+- package.json devDependencies must include exactly "typescript": "^5.4.5", "vite": "^5.4.0", "@vitejs/plugin-react": "^4.3.1", "@types/react": "^18.2.66", "@types/react-dom": "^18.2.22".
+- src/main.tsx must use createRoot from "react-dom/client", not ReactDOM.render.
+- Do not use Vite 3.x, @vitejs/plugin-react 3.x, ReactDOM.render, or any package not listed in package.json.
 - Do not reference missing CSS files or assets.
 - Keep each file concise enough to fit in this response.
 - Follow the strict file output contract: each heading immediately followed by one code block.`;
