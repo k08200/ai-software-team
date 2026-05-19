@@ -21,6 +21,21 @@ function optionalInt(key: string, fallback: number): number {
   return n;
 }
 
+function optionalChoice<const T extends readonly string[]>(
+  key: string,
+  fallback: T[number],
+  choices: T,
+): T[number] {
+  const val = optional(key, fallback);
+  if (!choices.includes(val)) {
+    throw new Error(`Env var ${key} must be one of: ${choices.join(", ")}`);
+  }
+  return val as T[number];
+}
+
+const llmProvider = optionalChoice("LLM_PROVIDER", "ollama", ["ollama", "anthropic"] as const);
+const pipelineProfile = optionalChoice("PIPELINE_PROFILE", "full", ["full", "smoke"] as const);
+
 export const config = {
   port: optionalInt("PORT", 3001),
   nodeEnv: optional("NODE_ENV", "development"),
@@ -29,15 +44,15 @@ export const config = {
   demoMode: optional("DEMO_MODE", "false") === "true",
 
   llm: {
-    provider: optional("LLM_PROVIDER", "ollama") as "ollama" | "anthropic",
-    model: optional("LLM_PROVIDER", "ollama") === "anthropic"
+    provider: llmProvider,
+    model: llmProvider === "anthropic"
       ? optional("ANTHROPIC_MODEL", "claude-opus-4-6")
       : optional("OLLAMA_MODEL", "qwen2.5-coder:14b"),
   },
 
   anthropic: {
     // In demo/Ollama mode the API key is not used — skip the required() check
-    apiKey: optional("DEMO_MODE", "false") === "true" || optional("LLM_PROVIDER", "ollama") !== "anthropic"
+    apiKey: optional("DEMO_MODE", "false") === "true" || llmProvider !== "anthropic"
       ? optional("ANTHROPIC_API_KEY", "demo-key")
       : required("ANTHROPIC_API_KEY"),
     model: optional("ANTHROPIC_MODEL", "claude-opus-4-6"),
@@ -50,8 +65,10 @@ export const config = {
   },
 
   pipeline: {
+    profile: pipelineProfile,
     maxRounds: optionalInt("MAX_ROUNDS", 3),
     minRounds: optionalInt("MIN_ROUNDS", 3),
+    smokeMaxTokens: optionalInt("SMOKE_MAX_TOKENS", 2048),
     maxConcurrent: optionalInt("MAX_CONCURRENT_PIPELINES", 3),
     outputTtlHours: optionalInt("OUTPUT_TTL_HOURS", 24),
   },

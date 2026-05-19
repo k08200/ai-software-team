@@ -104,6 +104,7 @@ const server = app.listen(config.port, () => {
   console.log(`\n🤖 AI Software Engineering Team v2.0`);
   console.log(`   Server: http://localhost:${config.port}`);
   console.log(`   LLM:    ${config.llm.provider} (${config.llm.model})`);
+  console.log(`   Profile: ${config.pipeline.profile}`);
   console.log(`   Rounds: min=${config.pipeline.minRounds} max=${config.pipeline.maxRounds}`);
   console.log(`   DB:     ${config.database.url ? "PostgreSQL connected" : "No DB (file-based mode)"}`);
   console.log(`   Stripe: ${config.stripe.secretKey ? "enabled" : "disabled"}\n`);

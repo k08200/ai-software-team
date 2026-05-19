@@ -105,6 +105,16 @@ npm run dev
 
 브라우저에서 http://localhost:3000 열기
 
+### 5. 로컬 Ollama smoke 실행
+
+Ollama가 `http://localhost:11434`에서 `Ollama is running`을 보여주면, 먼저 짧은 smoke 프로필로 실제 생성 흐름을 확인합니다. 이 모드는 CTO/PM/Backend/Frontend까지만 실행하고 QA/Security/Review 반복 라운드는 건너뛰므로 로컬 모델 첫 검증에 적합합니다.
+
+```bash
+npm run smoke:ollama -- "간단한 메모 앱 만들어줘"
+```
+
+전체 검증까지 돌릴 준비가 됐을 때는 `PIPELINE_PROFILE=full`과 기본 라운드 설정을 사용합니다.
+
 ## 사용 방법
 
 1. 입력창에 제품 아이디어 입력 (예: "할 일 앱 만들어줘")
@@ -133,8 +143,10 @@ npm run dev
 | `ANTHROPIC_API_KEY` | 선택 | `LLM_PROVIDER=anthropic`일 때 필요한 Anthropic API 키 |
 | `ANTHROPIC_MODEL` | `claude-opus-4-6` | Anthropic provider에서 사용할 Claude 모델 |
 | `THINKING_BUDGET` | `8000` | Extended thinking 토큰 예산 |
+| `PIPELINE_PROFILE` | `full` | 실행 프로필 (`full` 또는 `smoke`) |
 | `MAX_ROUNDS` | `3` | 최대 반복 라운드 수 |
 | `MIN_ROUNDS` | `3` | 최소 반복 라운드 수 |
+| `SMOKE_MAX_TOKENS` | `2048` | `PIPELINE_PROFILE=smoke`에서 에이전트별 최대 생성 토큰 |
 | `PORT` | `3001` | 서버 포트 |
 | `VERIFY_GENERATED_PROJECTS` | `false` | 생성된 프로젝트에서 `npm install`, `npm run build`, `npm test`를 실행할지 여부 |
 | `VERIFY_TIMEOUT_MS` | `120000` | 생성 프로젝트 검증 명령별 타임아웃 |
@@ -211,6 +223,7 @@ curl http://localhost:3001/health
 - 기본값은 `LLM_PROVIDER=ollama`입니다. 투자 전/로컬 개발 단계에서 API 비용 없이 실행할 수 있습니다.
 - SaaS 운영 전까지는 BYOK(Bring Your Own Key) 또는 local-first 전략을 권장합니다.
 - Anthropic은 선택 provider입니다. `LLM_PROVIDER=anthropic`일 때만 `ANTHROPIC_API_KEY`가 필요합니다.
+- 로컬 첫 실행은 `npm run smoke:ollama`로 시작하는 것을 권장합니다. 전체 7-agent 반복 파이프라인보다 빠르게 모델 연결, 파일 생성, ZIP 패키징까지 확인할 수 있습니다.
 
 ## 주의사항
 

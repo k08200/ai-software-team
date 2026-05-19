@@ -149,7 +149,8 @@ router.get("/status", (_req: Request, res: Response): void => {
     status: "ok",
     provider: config.llm.provider,
     model: config.llm.model,
-    maxRounds: parseInt(process.env.MAX_ROUNDS ?? "3", 10),
+    profile: config.pipeline.profile,
+    maxRounds: config.pipeline.maxRounds,
     timestamp: new Date().toISOString(),
   });
 });

@@ -14,6 +14,7 @@ const MODEL = appConfig.llm.model;
 const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET ?? "8000", 10);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 const LLM_PROVIDER = appConfig.llm.provider;
+const PIPELINE_PROFILE = appConfig.pipeline.profile;
 
 // Fake token counts for demo — realistic-looking numbers
 const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
@@ -41,6 +42,9 @@ export abstract class BaseAgent {
     this.config = {
       ...config,
       model: config.model ?? MODEL,
+      maxTokens: PIPELINE_PROFILE === "smoke"
+        ? Math.min(config.maxTokens, appConfig.pipeline.smokeMaxTokens)
+        : config.maxTokens,
       thinkingBudget: config.thinkingBudget ?? THINKING_BUDGET,
     };
   }

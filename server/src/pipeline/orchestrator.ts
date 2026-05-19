@@ -2,7 +2,6 @@ import type {
   PipelineContext,
   SSEEvent,
   AgentOutput,
-  RoundResult,
 } from "../types.js";
 import { CTOAgent } from "../agents/cto-agent.js";
 import { PMAgent } from "../agents/pm-agent.js";
@@ -25,8 +24,8 @@ import {
 } from "../utils/project-verifier.js";
 import type { StreamCallback } from "../agents/base-agent.js";
 
-const MAX_ROUNDS = parseInt(process.env.MAX_ROUNDS ?? "3", 10);
-const MIN_ROUNDS = parseInt(process.env.MIN_ROUNDS ?? "3", 10);
+const MAX_ROUNDS = config.pipeline.maxRounds;
+const MIN_ROUNDS = config.pipeline.minRounds;
 
 export class PipelineOrchestrator {
   private ctoAgent = new CTOAgent();
@@ -58,14 +57,15 @@ export class PipelineOrchestrator {
     };
 
     // Emit cost estimate upfront
+    const estimatedRounds = config.pipeline.profile === "smoke" ? 0 : MAX_ROUNDS;
     const costEstimate = estimateCost(
       config.llm.model,
-      MAX_ROUNDS,
+      estimatedRounds,
       config.llm.provider,
     );
     emit({
       type: "pipeline_start",
-      data: { projectIdea, sessionId, costEstimate },
+      data: { projectIdea, sessionId, profile: config.pipeline.profile, costEstimate },
     });
 
     await saveSession({
@@ -117,151 +117,19 @@ export class PipelineOrchestrator {
         (o) => fileManager.saveAgentOutput(o),
       );
 
-      // ─── Phase 5: Iteration loop ──────────────────────────────────
-      let round = 0;
-      let totalIssues = Infinity;
-
-      while (
-        (round < MIN_ROUNDS || totalIssues > 0) &&
-        round < MAX_ROUNDS
-      ) {
-        round++;
-        emit({ type: "round_start", data: { round } });
-
-        // QA and Security run IN PARALLEL (they're independent)
-        const prevRound = ctx.rounds[round - 2];
-        const [qaOutput, securityOutput] = await Promise.all([
-          this.runAgentWithOutput(
-            "qa", "QA Agent",
-            this.qaAgent.buildPrompt(
-              projectIdea,
-              ctx.prd ?? "",
-              ctx.backendCode ?? "",
-              ctx.frontendCode ?? "",
-              round,
-              prevRound?.qaOutput.content,
-            ),
-            emit,
-            (o) => fileManager.saveAgentOutput({ ...o, agentId: "qa" as const }),
-            round,
-          ),
-          this.runAgentWithOutput(
-            "security", "Security Agent",
-            this.securityAgent.buildPrompt(
-              projectIdea,
-              ctx.backendCode ?? "",
-              ctx.frontendCode ?? "",
-              round,
-              prevRound?.securityOutput.content,
-            ),
-            emit,
-            (o) => fileManager.saveAgentOutput({ ...o, agentId: "security" as const }),
-            round,
-          ),
-        ]);
-
-        // Review runs after QA + Security (needs their output as context)
-        const reviewOutput = await this.runAgentWithOutput(
-          "review", "Review Agent",
-          this.reviewAgent.buildPrompt(
-            projectIdea,
-            ctx.architecture ?? "",
-            ctx.backendCode ?? "",
-            ctx.frontendCode ?? "",
-            round,
-            qaOutput.content,
-            securityOutput.content,
-          ),
-          emit,
-          (o) => fileManager.saveAgentOutput({ ...o, agentId: "review" as const }),
-          round,
-        );
-
-        const issues = countIssues(
-          qaOutput.content,
-          securityOutput.content,
-          reviewOutput.content,
-        );
-        totalIssues = issues.total;
-
-        const roundResult: RoundResult = {
-          round,
-          qaOutput,
-          securityOutput,
-          reviewOutput,
-          issues,
-        };
-        ctx.rounds.push(roundResult);
-
+      if (config.pipeline.profile === "smoke") {
         emit({
-          type: "issues_update",
+          type: "round_complete",
           data: {
-            round,
-            qaIssues: issues.qa.length,
-            securityIssues: issues.security.length,
-            reviewIssues: issues.review.length,
-            total: issues.total,
+            round: 0,
+            totalIssues: 0,
+            applying_fixes: false,
+            skipped: true,
+            reason: "PIPELINE_PROFILE=smoke",
           },
         });
-
-        // ── Apply fixes if there are issues and more rounds remain ──
-        if (totalIssues > 0 && round < MAX_ROUNDS) {
-          emit({
-            type: "round_complete",
-            data: { round, totalIssues, applying_fixes: true },
-          });
-
-          const issuesSummary = [
-            ...issues.qa.slice(0, 10),
-            ...issues.security.slice(0, 10),
-            ...issues.review.slice(0, 5),
-          ].join("\n- ");
-
-          // Fix backend and frontend IN PARALLEL
-          const backendFixPromise: Promise<string> =
-            issues.qa.length + issues.security.length > 0
-              ? this.runAgent(
-                  "backend", "Backend Fix Agent",
-                  this.backendFixAgent.buildPrompt(
-                    ctx.backendCode ?? "",
-                    issues.qa.slice(0, 10).join("\n"),
-                    issues.security.slice(0, 10).join("\n"),
-                    issues.review.slice(0, 5).join("\n"),
-                    ctx.architecture ?? "",
-                  ),
-                  emit,
-                  (o) => fileManager.saveFile(`round-${round}-backend-fixed.ts`, o.content),
-                )
-              : Promise.resolve(ctx.backendCode ?? "");
-
-          const frontendFixPromise: Promise<string> =
-            issues.qa.length + issues.review.length > 0
-              ? this.runAgent(
-                  "frontend", "Frontend Fix Agent",
-                  this.frontendFixAgent.buildPrompt(
-                    ctx.frontendCode ?? "",
-                    issues.qa.slice(0, 10).join("\n"),
-                    issues.review.slice(0, 5).join("\n"),
-                  ),
-                  emit,
-                  (o) => fileManager.saveFile(`round-${round}-frontend-fixed.tsx`, o.content),
-                )
-              : Promise.resolve(ctx.frontendCode ?? "");
-
-          const [fixedBackend, fixedFrontend] = await Promise.all([
-            backendFixPromise,
-            frontendFixPromise,
-          ]);
-
-          // Update the code context for next round's review
-          ctx.backendCode = fixedBackend;
-          ctx.frontendCode = fixedFrontend;
-        } else {
-          emit({
-            type: "round_complete",
-            data: { round, totalIssues, applying_fixes: false },
-          });
-        }
+      } else {
+        await this.runIterationLoop(projectIdea, fileManager, ctx, emit);
       }
 
       // ─── Create ZIP ────────────────────────────────────────────────
@@ -428,14 +296,157 @@ export class PipelineOrchestrator {
     return agent;
   }
 
+  private async runIterationLoop(
+    projectIdea: string,
+    fileManager: FileManager,
+    ctx: PipelineContext,
+    emit: (event: SSEEvent) => void,
+  ): Promise<void> {
+    let round = 0;
+    let totalIssues = Infinity;
+
+    while (
+      (round < MIN_ROUNDS || totalIssues > 0) &&
+      round < MAX_ROUNDS
+    ) {
+      round++;
+      emit({ type: "round_start", data: { round } });
+
+      const prevRound = ctx.rounds[round - 2];
+      const [qaOutput, securityOutput] = await Promise.all([
+        this.runAgentWithOutput(
+          "qa", "QA Agent",
+          this.qaAgent.buildPrompt(
+            projectIdea,
+            ctx.prd ?? "",
+            ctx.backendCode ?? "",
+            ctx.frontendCode ?? "",
+            round,
+            prevRound?.qaOutput.content,
+          ),
+          emit,
+          (o) => fileManager.saveAgentOutput({ ...o, agentId: "qa" as const }),
+          round,
+        ),
+        this.runAgentWithOutput(
+          "security", "Security Agent",
+          this.securityAgent.buildPrompt(
+            projectIdea,
+            ctx.backendCode ?? "",
+            ctx.frontendCode ?? "",
+            round,
+            prevRound?.securityOutput.content,
+          ),
+          emit,
+          (o) => fileManager.saveAgentOutput({ ...o, agentId: "security" as const }),
+          round,
+        ),
+      ]);
+
+      const reviewOutput = await this.runAgentWithOutput(
+        "review", "Review Agent",
+        this.reviewAgent.buildPrompt(
+          projectIdea,
+          ctx.architecture ?? "",
+          ctx.backendCode ?? "",
+          ctx.frontendCode ?? "",
+          round,
+          qaOutput.content,
+          securityOutput.content,
+        ),
+        emit,
+        (o) => fileManager.saveAgentOutput({ ...o, agentId: "review" as const }),
+        round,
+      );
+
+      const issues = countIssues(
+        qaOutput.content,
+        securityOutput.content,
+        reviewOutput.content,
+      );
+      totalIssues = issues.total;
+
+      ctx.rounds.push({
+        round,
+        qaOutput,
+        securityOutput,
+        reviewOutput,
+        issues,
+      });
+
+      emit({
+        type: "issues_update",
+        data: {
+          round,
+          qaIssues: issues.qa.length,
+          securityIssues: issues.security.length,
+          reviewIssues: issues.review.length,
+          total: issues.total,
+        },
+      });
+
+      if (totalIssues > 0 && round < MAX_ROUNDS) {
+        emit({
+          type: "round_complete",
+          data: { round, totalIssues, applying_fixes: true },
+        });
+
+        const backendFixPromise: Promise<string> =
+          issues.qa.length + issues.security.length > 0
+            ? this.runAgent(
+                "backend", "Backend Fix Agent",
+                this.backendFixAgent.buildPrompt(
+                  ctx.backendCode ?? "",
+                  issues.qa.slice(0, 10).join("\n"),
+                  issues.security.slice(0, 10).join("\n"),
+                  issues.review.slice(0, 5).join("\n"),
+                  ctx.architecture ?? "",
+                ),
+                emit,
+                (o) => fileManager.saveFile(`round-${round}-backend-fixed.ts`, o.content),
+              )
+            : Promise.resolve(ctx.backendCode ?? "");
+
+        const frontendFixPromise: Promise<string> =
+          issues.qa.length + issues.review.length > 0
+            ? this.runAgent(
+                "frontend", "Frontend Fix Agent",
+                this.frontendFixAgent.buildPrompt(
+                  ctx.frontendCode ?? "",
+                  issues.qa.slice(0, 10).join("\n"),
+                  issues.review.slice(0, 5).join("\n"),
+                ),
+                emit,
+                (o) => fileManager.saveFile(`round-${round}-frontend-fixed.tsx`, o.content),
+              )
+            : Promise.resolve(ctx.frontendCode ?? "");
+
+        const [fixedBackend, fixedFrontend] = await Promise.all([
+          backendFixPromise,
+          frontendFixPromise,
+        ]);
+
+        ctx.backendCode = fixedBackend;
+        ctx.frontendCode = fixedFrontend;
+      } else {
+        emit({
+          type: "round_complete",
+          data: { round, totalIssues, applying_fixes: false },
+        });
+      }
+    }
+  }
+
   private async saveSummary(
     fileManager: FileManager,
     ctx: PipelineContext,
     verification: ProjectVerification[],
   ): Promise<void> {
-    const roundSummary = ctx.rounds
-      .map((r) => `Round ${r.round}: ${r.issues.total} issues (QA: ${r.issues.qa.length}, Security: ${r.issues.security.length}, Review: ${r.issues.review.length})`)
-      .join("\n");
+    const roundSummary = ctx.rounds.length > 0
+      ? ctx.rounds
+          .map((r) => `Round ${r.round}: ${r.issues.total} issues (QA: ${r.issues.qa.length}, Security: ${r.issues.security.length}, Review: ${r.issues.review.length})`)
+          .join("\n")
+      : "No review rounds were run for this profile.";
 
     const summary = `# AI Software Team — Generation Summary
 
@@ -453,6 +464,8 @@ ${Object.entries(this.tokenTracker.getSummary())
   .join("\n")}
 
 ## Iteration Rounds
+Profile: ${config.pipeline.profile}
+
 ${roundSummary}
 
 ${formatVerificationReport(verification)}
