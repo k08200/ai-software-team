@@ -68,7 +68,7 @@ export const config = {
     profile: pipelineProfile,
     maxRounds: optionalInt("MAX_ROUNDS", 3),
     minRounds: optionalInt("MIN_ROUNDS", 3),
-    smokeMaxTokens: optionalInt("SMOKE_MAX_TOKENS", 2048),
+    smokeMaxTokens: optionalInt("SMOKE_MAX_TOKENS", 768),
     maxConcurrent: optionalInt("MAX_CONCURRENT_PIPELINES", 3),
     outputTtlHours: optionalInt("OUTPUT_TTL_HOURS", 24),
   },

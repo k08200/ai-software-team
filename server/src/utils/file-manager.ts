@@ -115,12 +115,27 @@ export class FileManager {
   private extractFiles(markdown: string): Array<{ filename: string; content: string }> {
     const files: Array<{ filename: string; content: string }> = [];
     let match: RegExpExecArray | null;
+    let lastMatchEnd = 0;
 
     while ((match = CODE_BLOCK_RE.exec(markdown)) !== null) {
+      lastMatchEnd = CODE_BLOCK_RE.lastIndex;
       const heading = match[1]?.trim() ?? "";
       const filename = this.extractFilenameFromHeading(heading);
       const content = match[2] ?? "";
       if (filename && content.trim().length > 0) {
+        files.push({
+          filename,
+          content: content.replace(/\n$/, ""),
+        });
+      }
+    }
+
+    const trailing = markdown.slice(lastMatchEnd);
+    const trailingMatch = trailing.match(/(?:^|\n)#{1,6}\s+([^\n]+)\n```[^\n]*\n([\s\S]*)$/);
+    if (trailingMatch) {
+      const filename = this.extractFilenameFromHeading(trailingMatch[1]?.trim() ?? "");
+      const content = trailingMatch[2] ?? "";
+      if (filename && content.trim().length > 0 && !files.some((file) => file.filename === filename)) {
         files.push({
           filename,
           content: content.replace(/\n$/, ""),

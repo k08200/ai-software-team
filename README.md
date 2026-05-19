@@ -146,7 +146,7 @@ npm run smoke:ollama -- "간단한 메모 앱 만들어줘"
 | `PIPELINE_PROFILE` | `full` | 실행 프로필 (`full` 또는 `smoke`) |
 | `MAX_ROUNDS` | `3` | 최대 반복 라운드 수 |
 | `MIN_ROUNDS` | `3` | 최소 반복 라운드 수 |
-| `SMOKE_MAX_TOKENS` | `2048` | `PIPELINE_PROFILE=smoke`에서 에이전트별 최대 생성 토큰 |
+| `SMOKE_MAX_TOKENS` | `768` | `PIPELINE_PROFILE=smoke`에서 에이전트별 최대 생성 토큰 |
 | `PORT` | `3001` | 서버 포트 |
 | `VERIFY_GENERATED_PROJECTS` | `false` | 생성된 프로젝트에서 `npm install`, `npm run build`, `npm test`를 실행할지 여부 |
 | `VERIFY_TIMEOUT_MS` | `120000` | 생성 프로젝트 검증 명령별 타임아웃 |

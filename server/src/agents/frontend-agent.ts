@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config } from "../config.js";
 
 const SYSTEM_PROMPT = `You are a Senior Frontend Engineer specializing in modern React applications.
 
@@ -72,6 +73,26 @@ export class FrontendAgent extends BaseAgent {
     prd: string,
     backendCode: string,
   ): string {
+    if (config.pipeline.profile === "smoke") {
+      return `Product Idea: "${projectIdea}"
+
+SMOKE MODE: Implement a tiny runnable React frontend only. Keep it simple and complete.
+
+Return exactly these files, and no other text:
+### package.json
+### index.html
+### vite.config.ts
+### src/main.tsx
+
+Requirements:
+- Use React 18 + TypeScript + Vite.
+- Implement a single-page memo UI with create and delete behavior.
+- Use local component state; do not add routing or extra libraries.
+- Do not reference missing CSS files or assets.
+- Keep each file concise enough to fit in this response.
+- Follow the strict file output contract: each heading immediately followed by one code block.`;
+    }
+
     return `Product Idea: "${projectIdea}"
 
 ## Technical Architecture:

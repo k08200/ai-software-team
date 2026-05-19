@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config } from "../config.js";
 
 const SYSTEM_PROMPT = `You are a Senior Backend Engineer. You write production-quality, complete server-side code.
 
@@ -69,6 +70,25 @@ export class BackendAgent extends BaseAgent {
   }
 
   buildPrompt(projectIdea: string, architecture: string, prd: string): string {
+    if (config.pipeline.profile === "smoke") {
+      return `Product Idea: "${projectIdea}"
+
+SMOKE MODE: Implement a tiny runnable backend only. Keep it simple and complete.
+
+Return exactly these files, and no other text:
+### package.json
+### tsconfig.json
+### src/index.ts
+
+Requirements:
+- Use Express + TypeScript.
+- Use in-memory storage only.
+- Implement only: GET /health, GET /memos, POST /memos, PUT /memos/:id, DELETE /memos/:id.
+- Do not add comments or extra architecture layers.
+- Keep each file concise enough to fit in this response.
+- Follow the strict file output contract: each heading immediately followed by one code block.`;
+    }
+
     return `Product Idea: "${projectIdea}"
 
 ## Technical Architecture:

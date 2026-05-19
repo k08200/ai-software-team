@@ -54,13 +54,17 @@ export abstract class BaseAgent {
     onStream: StreamCallback,
     round?: number,
   ): Promise<AgentOutput> {
+    const effectiveMessage = PIPELINE_PROFILE === "smoke"
+      ? `${userMessage}\n\nSMOKE MODE: Keep the response compact and focused on a minimal working MVP. Prefer concise architecture, small code samples, and the smallest complete implementation that proves the pipeline works.`
+      : userMessage;
+
     if (DEMO_MODE) {
       return this.runDemo(onStream, round);
     }
     if (LLM_PROVIDER === "ollama") {
-      return this.runOllama(userMessage, onStream);
+      return this.runOllama(effectiveMessage, onStream);
     }
-    return this.runAnthropic(userMessage, onStream);
+    return this.runAnthropic(effectiveMessage, onStream);
   }
 
   // ── Demo mode: stream pre-written responses with realistic delays ──────

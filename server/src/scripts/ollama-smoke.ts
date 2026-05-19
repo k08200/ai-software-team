@@ -4,7 +4,7 @@ process.env.LLM_PROVIDER ??= "ollama";
 process.env.OLLAMA_BASE_URL ??= "http://localhost:11434";
 process.env.OLLAMA_MODEL ??= "qwen2.5-coder:14b";
 process.env.PIPELINE_PROFILE ??= "smoke";
-process.env.SMOKE_MAX_TOKENS ??= "2048";
+process.env.SMOKE_MAX_TOKENS ??= "768";
 process.env.DEMO_MODE ??= "false";
 process.env.JWT_SECRET ??= "local-smoke";
 
@@ -18,11 +18,17 @@ async function main(): Promise<void> {
   console.log(`[ollama-smoke] model=${process.env.OLLAMA_MODEL}`);
   console.log(`[ollama-smoke] session=${sessionId}`);
 
+  let outputChunks = 0;
+
   await orchestrator.run(idea, sessionId, undefined, (event) => {
     if (event.type === "agent_start") {
-      console.log(`[agent:start] ${event.data.agentName}`);
+      outputChunks = 0;
+      process.stdout.write(`[agent:start] ${event.data.agentName}`);
+    } else if (event.type === "agent_output") {
+      outputChunks++;
+      if (outputChunks % 24 === 0) process.stdout.write(".");
     } else if (event.type === "agent_complete") {
-      console.log(`[agent:complete] ${event.data.agentName} (${event.data.duration}ms)`);
+      console.log(`\n[agent:complete] ${event.data.agentName} (${event.data.duration}ms)`);
     } else if (event.type === "round_complete" && event.data.skipped) {
       console.log(`[round:skipped] ${event.data.reason}`);
     } else if (event.type === "pipeline_complete") {
