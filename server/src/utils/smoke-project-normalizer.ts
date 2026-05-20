@@ -10,12 +10,16 @@ type PackageJson = {
 };
 
 const BACKEND_DEPENDENCIES = {
+  cors: "^2.8.5",
   express: "^4.19.2",
+  uuid: "^10.0.0",
 };
 
 const BACKEND_DEV_DEPENDENCIES = {
+  "@types/cors": "^2.8.17",
   "@types/express": "^4.17.21",
   "@types/node": "^20.14.0",
+  "@types/uuid": "^10.0.0",
   tsx: "^4.15.6",
   typescript: "^5.4.5",
 };

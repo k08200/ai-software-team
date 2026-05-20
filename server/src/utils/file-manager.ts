@@ -5,6 +5,7 @@ import { createWriteStream } from "fs";
 import type { AgentOutput } from "../types.js";
 
 const FILE_HEADING_RE = /(?:^|\s)([A-Za-z0-9_.@/-]+(?:\.[A-Za-z0-9_.-]+)+)(?:\s|$)/;
+const FILE_SECTION_HEADING_RE = /^#{1,6}\s+([^\n]+)$/gm;
 const CODE_BLOCK_RE = /(?:^|\n)(?:#{1,6}\s+([^\n]+)\n)?```[^\n]*\n([\s\S]*?)```/g;
 
 export class FileManager {
@@ -113,6 +114,9 @@ export class FileManager {
   }
 
   private extractFiles(markdown: string): Array<{ filename: string; content: string }> {
+    const headingSections = this.extractHeadingFileSections(markdown);
+    if (headingSections.length > 0) return headingSections;
+
     const files: Array<{ filename: string; content: string }> = [];
     let match: RegExpExecArray | null;
     let lastMatchEnd = 0;
@@ -144,6 +148,47 @@ export class FileManager {
     }
 
     return files;
+  }
+
+  private extractHeadingFileSections(markdown: string): Array<{ filename: string; content: string }> {
+    const headings: Array<{ filename: string; start: number; contentStart: number }> = [];
+    let match: RegExpExecArray | null;
+
+    FILE_SECTION_HEADING_RE.lastIndex = 0;
+    while ((match = FILE_SECTION_HEADING_RE.exec(markdown)) !== null) {
+      const filename = this.extractFilenameFromHeading(match[1]?.trim() ?? "");
+      if (!filename) continue;
+
+      const afterHeading = match.index + match[0].length;
+      const fenceMatch = markdown.slice(afterHeading).match(/^\s*```[^\n]*\n/);
+      if (!fenceMatch) continue;
+
+      headings.push({
+        filename,
+        start: match.index,
+        contentStart: afterHeading + fenceMatch[0].length,
+      });
+    }
+
+    return headings
+      .map((heading, index) => {
+        const nextHeading = headings[index + 1];
+        const rawContent = markdown.slice(
+          heading.contentStart,
+          nextHeading ? nextHeading.start : markdown.length,
+        );
+        return {
+          filename: heading.filename,
+          content: this.stripClosingFence(rawContent),
+        };
+      })
+      .filter((file) => file.content.trim().length > 0);
+  }
+
+  private stripClosingFence(content: string): string {
+    return content
+      .replace(/\n?```\s*$/m, "")
+      .replace(/\n$/, "");
   }
 
   private extractFilenameFromHeading(heading: string): string | null {

@@ -28,6 +28,7 @@ import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = config.pipeline.maxRounds;
 const MIN_ROUNDS = config.pipeline.minRounds;
+const SKIPS_REVIEW_ROUNDS = config.pipeline.profile === "smoke" || config.pipeline.profile === "mvp";
 
 export class PipelineOrchestrator {
   private ctoAgent = new CTOAgent();
@@ -59,7 +60,7 @@ export class PipelineOrchestrator {
     };
 
     // Emit cost estimate upfront
-    const estimatedRounds = config.pipeline.profile === "smoke" ? 0 : MAX_ROUNDS;
+    const estimatedRounds = SKIPS_REVIEW_ROUNDS ? 0 : MAX_ROUNDS;
     const costEstimate = estimateCost(
       config.llm.model,
       estimatedRounds,
@@ -119,7 +120,7 @@ export class PipelineOrchestrator {
         (o) => fileManager.saveAgentOutput(o),
       );
 
-      if (config.pipeline.profile === "smoke") {
+      if (SKIPS_REVIEW_ROUNDS) {
         emit({
           type: "round_complete",
           data: {
@@ -127,7 +128,7 @@ export class PipelineOrchestrator {
             totalIssues: 0,
             applying_fixes: false,
             skipped: true,
-            reason: "PIPELINE_PROFILE=smoke",
+            reason: `PIPELINE_PROFILE=${config.pipeline.profile}`,
           },
         });
       } else {
@@ -151,7 +152,7 @@ export class PipelineOrchestrator {
         ),
       ]);
 
-      if (config.pipeline.profile === "smoke") {
+      if (SKIPS_REVIEW_ROUNDS) {
         await normalizeSmokeGeneratedProjects(fileManager.getOutputDir());
       }
 

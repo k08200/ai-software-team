@@ -34,7 +34,7 @@ function optionalChoice<const T extends readonly string[]>(
 }
 
 const llmProvider = optionalChoice("LLM_PROVIDER", "ollama", ["ollama", "anthropic"] as const);
-const pipelineProfile = optionalChoice("PIPELINE_PROFILE", "full", ["full", "smoke"] as const);
+const pipelineProfile = optionalChoice("PIPELINE_PROFILE", "full", ["full", "mvp", "smoke"] as const);
 
 export const config = {
   port: optionalInt("PORT", 3001),
@@ -60,7 +60,7 @@ export const config = {
   },
 
   ollama: {
-    baseUrl: optional("OLLAMA_BASE_URL", "http://localhost:11434"),
+    baseUrl: optional("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
     model: optional("OLLAMA_MODEL", "qwen2.5-coder:14b"),
   },
 
@@ -69,6 +69,7 @@ export const config = {
     maxRounds: optionalInt("MAX_ROUNDS", 3),
     minRounds: optionalInt("MIN_ROUNDS", 3),
     smokeMaxTokens: optionalInt("SMOKE_MAX_TOKENS", 768),
+    mvpMaxTokens: optionalInt("MVP_MAX_TOKENS", 6000),
     maxConcurrent: optionalInt("MAX_CONCURRENT_PIPELINES", 3),
     outputTtlHours: optionalInt("OUTPUT_TTL_HOURS", 24),
   },

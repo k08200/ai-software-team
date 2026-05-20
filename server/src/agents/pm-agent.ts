@@ -1,6 +1,9 @@
 import { BaseAgent } from "./base-agent.js";
+import { config } from "../config.js";
 
 const SYSTEM_PROMPT = `You are the Product Manager of an elite software engineering team. You translate technical architecture into actionable product requirements.
+
+If the user prompt says MVP MODE or SMOKE MODE, prioritize a compact, buildable vertical slice over exhaustive documentation.
 
 Given a product idea and technical architecture, produce:
 
@@ -69,6 +72,35 @@ export class PMAgent extends BaseAgent {
   }
 
   buildPrompt(projectIdea: string, architecture: string): string {
+    if (config.pipeline.profile === "mvp") {
+      return `Product Idea: "${projectIdea}"
+
+## Technical Architecture (from CTO):
+${architecture}
+
+MVP MODE: Produce a concise implementation spec for one usable vertical slice.
+
+Output only these sections:
+## Product Brief
+- Product name
+- Target user
+- Core job-to-be-done
+
+## User Stories
+- 3-5 must-have user stories in plain language.
+
+## API Specification
+- List each endpoint with method, path, purpose, request shape, and response shape.
+
+## Data Models
+- TypeScript interfaces for the 1-2 core entities.
+
+## Acceptance Criteria
+- 5-8 concrete checks the generated app must satisfy.
+
+Keep it specific, buildable, and under 1200 words.`;
+    }
+
     return `Product Idea: "${projectIdea}"
 
 ## Technical Architecture (from CTO):

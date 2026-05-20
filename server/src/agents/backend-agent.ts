@@ -5,7 +5,7 @@ const SYSTEM_PROMPT = `You are a Senior Backend Engineer. You write production-q
 
 You MUST write COMPLETE, RUNNABLE code — no placeholders, no "TODO" comments, no "implement this later".
 
-Requirements for ALL code you write:
+Default full-profile requirements for code you write:
 1. TypeScript with strict mode
 2. Full error handling with proper HTTP status codes
 3. Input validation on all endpoints
@@ -15,7 +15,9 @@ Requirements for ALL code you write:
 7. Proper logging
 8. Clean architecture: routes → controllers → services → repositories
 
-When producing backend code, structure it as a complete project:
+When the user prompt says MVP MODE or SMOKE MODE, the mode-specific dependency and structure rules override the full-profile defaults.
+
+When producing full-profile backend code, structure it as a complete project:
 
 \`\`\`
 src/
@@ -92,6 +94,42 @@ Requirements:
 - Use a simple incrementing number id; do not import uuid.
 - Do not add comments or extra architecture layers.
 - Keep each file concise enough to fit in this response.
+- Follow the strict file output contract: each heading immediately followed by one code block.`;
+    }
+
+    if (config.pipeline.profile === "mvp") {
+      return `Product Idea: "${projectIdea}"
+
+## Technical Architecture:
+${architecture}
+
+## Product Requirements & API Specification:
+${prd}
+
+MVP MODE: Implement a small idea-specific Express + TypeScript backend that supports one usable vertical slice.
+
+Return exactly these files, and no other text:
+### package.json
+### tsconfig.json
+### .env.example
+### README.md
+### src/index.ts
+
+Requirements:
+- Use Express + TypeScript only.
+- Use in-memory storage with realistic seed data derived from the product idea.
+- Implement GET /health plus 3-5 REST endpoints under /api that match the PRD.
+- Include CORS-friendly JSON responses and consistent error responses.
+- Validate request bodies with small local helper functions; do not add validation libraries.
+- package.json must include scripts: "build": "tsc", "start": "node dist/index.js", "dev": "tsx src/index.ts".
+- package.json dependencies must include exactly "express": "^4.19.2", "cors": "^2.8.5".
+- package.json devDependencies must include exactly "typescript": "^5.4.5", "tsx": "^4.15.6", "@types/express": "^4.17.21", "@types/cors": "^2.8.17", "@types/node": "^20.14.0".
+- tsconfig.json must set "rootDir": "src", "outDir": "dist", "module": "CommonJS", "target": "ES2022", "esModuleInterop": true, and "strict": true.
+- Keep all backend source in src/index.ts for reliability.
+- Do not import packages that are not listed in package.json.
+- Do not import uuid; use a simple local incrementing id like let nextId = 3.
+- No databases, auth, payments, queues, Docker, or cloud services.
+- README.md must not contain fenced code blocks; write commands as inline code or plain bullet text.
 - Follow the strict file output contract: each heading immediately followed by one code block.`;
     }
 

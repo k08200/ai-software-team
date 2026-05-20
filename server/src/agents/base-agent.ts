@@ -15,6 +15,7 @@ const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET ?? "8000", 10);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 const LLM_PROVIDER = appConfig.llm.provider;
 const PIPELINE_PROFILE = appConfig.pipeline.profile;
+const IS_COMPACT_PROFILE = PIPELINE_PROFILE === "smoke" || PIPELINE_PROFILE === "mvp";
 
 // Fake token counts for demo — realistic-looking numbers
 const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
@@ -42,9 +43,7 @@ export abstract class BaseAgent {
     this.config = {
       ...config,
       model: config.model ?? MODEL,
-      maxTokens: PIPELINE_PROFILE === "smoke"
-        ? Math.min(config.maxTokens, appConfig.pipeline.smokeMaxTokens)
-        : config.maxTokens,
+      maxTokens: getProfileMaxTokens(config.maxTokens),
       thinkingBudget: config.thinkingBudget ?? THINKING_BUDGET,
     };
   }
@@ -54,8 +53,8 @@ export abstract class BaseAgent {
     onStream: StreamCallback,
     round?: number,
   ): Promise<AgentOutput> {
-    const effectiveMessage = PIPELINE_PROFILE === "smoke"
-      ? `${userMessage}\n\nSMOKE MODE: Keep the response compact and focused on a minimal working MVP. Prefer concise architecture, small code samples, and the smallest complete implementation that proves the pipeline works.`
+    const effectiveMessage = IS_COMPACT_PROFILE
+      ? `${userMessage}\n\n${getProfileInstruction()}`
       : userMessage;
 
     if (DEMO_MODE) {
@@ -261,6 +260,28 @@ export abstract class BaseAgent {
       throw new Error(`[${this.config.agentName}] Ollama error: ${message}`);
     }
   }
+}
+
+function getProfileMaxTokens(agentMaxTokens: number): number {
+  if (PIPELINE_PROFILE === "smoke") {
+    return Math.min(agentMaxTokens, appConfig.pipeline.smokeMaxTokens);
+  }
+  if (PIPELINE_PROFILE === "mvp") {
+    return Math.min(agentMaxTokens, appConfig.pipeline.mvpMaxTokens);
+  }
+  return agentMaxTokens;
+}
+
+function getProfileInstruction(): string {
+  if (PIPELINE_PROFILE === "mvp") {
+    return [
+      "MVP MODE: Keep the response compact, implementation-first, and focused on one polished vertical slice.",
+      "Prefer a small, complete, runnable product over broad architecture.",
+      "Avoid optional infrastructure, paid services, queues, external databases, and heavy dependency stacks.",
+    ].join(" ");
+  }
+
+  return "SMOKE MODE: Keep the response compact and focused on a minimal working MVP. Prefer concise architecture, small code samples, and the smallest complete implementation that proves the pipeline works.";
 }
 
 function sleep(ms: number): Promise<void> {
