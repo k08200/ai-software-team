@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 import { usePipeline } from "../hooks/usePipeline.js";
 import type { PipelineProfile } from "../types/index.js";
+import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 const EXAMPLES = [
   "할 일 앱 만들어줘",
@@ -18,18 +19,18 @@ const PROFILE_OPTIONS: Array<{
 }> = [
   {
     id: "mvp",
-    label: "MVP",
-    description: "아이디어 맞춤 앱, 로컬 추천",
+    label: PROFILE_DETAILS.mvp.label,
+    description: PROFILE_DETAILS.mvp.description,
   },
   {
     id: "smoke",
-    label: "Smoke",
-    description: "연결/ZIP 빠른 확인",
+    label: PROFILE_DETAILS.smoke.label,
+    description: PROFILE_DETAILS.smoke.description,
   },
   {
     id: "full",
-    label: "Full",
-    description: "전체 리뷰 라운드",
+    label: PROFILE_DETAILS.full.label,
+    description: PROFILE_DETAILS.full.description,
   },
 ];
 
@@ -98,7 +99,7 @@ export function IdeaInput() {
         )}
 
         {!isRunning && (
-          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pipeline profile">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Pipeline profile">
             {PROFILE_OPTIONS.map((option) => {
               const selected = profile === option.id;
               return (

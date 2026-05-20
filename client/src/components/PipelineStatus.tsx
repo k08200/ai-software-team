@@ -1,9 +1,6 @@
 import { usePipelineStore } from "../store/pipeline-store.js";
 import type { AgentId, AgentStatus } from "../types/index.js";
-
-const PIPELINE_ORDER: AgentId[] = [
-  "cto", "pm", "backend", "frontend", "qa", "security", "review",
-];
+import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 function StatusDot({ status }: { status: AgentStatus }) {
   if (status === "pending") {
@@ -70,19 +67,26 @@ function AgentPill({ agentId }: { agentId: AgentId }) {
 
 export function PipelineStatus() {
   const status = usePipelineStore((s) => s.status);
+  const profile = usePipelineStore((s) => s.profile);
+  const profileDetails = PROFILE_DETAILS[profile];
 
   if (status === "idle") return null;
 
   return (
     <div className="bg-gray-900 rounded-2xl border border-gray-700 p-6">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-4">
-        Agent Pipeline
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-        {PIPELINE_ORDER.map((agentId, i) => (
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-widest">
+          Agent Pipeline
+        </h3>
+        <span className="w-fit rounded-md border border-gray-700 bg-gray-950/60 px-2 py-1 text-xs text-gray-300">
+          {profileDetails.label} · {profileDetails.agentOrder.length} agents
+        </span>
+      </div>
+      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${profile === "full" ? "lg:grid-cols-7" : "lg:grid-cols-4"}`}>
+        {profileDetails.agentOrder.map((agentId, i) => (
           <div key={agentId} className="flex items-center gap-1">
             <AgentPill agentId={agentId} />
-            {i < PIPELINE_ORDER.length - 1 && (
+            {i < profileDetails.agentOrder.length - 1 && (
               <span className="text-gray-600 text-xs hidden lg:block">→</span>
             )}
           </div>

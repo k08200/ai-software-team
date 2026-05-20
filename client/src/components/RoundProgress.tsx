@@ -1,4 +1,5 @@
 import { usePipelineStore } from "../store/pipeline-store.js";
+import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 const MAX_DISPLAY_ROUNDS = 5;
 
@@ -30,9 +31,11 @@ export function RoundProgress() {
   const rounds = usePipelineStore((s) => s.rounds);
   const currentRound = usePipelineStore((s) => s.currentRound);
   const status = usePipelineStore((s) => s.status);
+  const profile = usePipelineStore((s) => s.profile);
 
   if (status === "idle") return null;
 
+  const skipsReviewRounds = profile !== "full";
   const maxIssues = Math.max(...rounds.map((r) => r.total), 1);
 
   return (
@@ -41,9 +44,15 @@ export function RoundProgress() {
         Issue Resolution Progress
       </h3>
 
-      {rounds.length === 0 && currentRound === 0 && (
+      {skipsReviewRounds && rounds.length === 0 && (
+        <div className="rounded-xl border border-cyan-900/50 bg-cyan-950/20 px-4 py-3 text-sm text-cyan-200">
+          {PROFILE_DETAILS[profile].skippedRoundsSummary}
+        </div>
+      )}
+
+      {!skipsReviewRounds && rounds.length === 0 && currentRound === 0 && (
         <div className="text-gray-500 text-sm text-center py-4">
-          Awaiting QA/Security/Review agents...
+          {PROFILE_DETAILS.full.skippedRoundsSummary}
         </div>
       )}
 

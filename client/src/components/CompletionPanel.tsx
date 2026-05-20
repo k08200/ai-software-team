@@ -2,6 +2,7 @@ import { CheckCircle, ExternalLink, MinusCircle, XCircle } from "lucide-react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 import { usePipeline } from "../hooks/usePipeline.js";
 import type { GeneratedVerificationCommand, VerificationStatus } from "../types/index.js";
+import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 export function CompletionPanel() {
   const status = usePipelineStore((s) => s.status);
@@ -11,6 +12,7 @@ export function CompletionPanel() {
   const generatedVerification = usePipelineStore((s) => s.generatedVerification);
   const generatedVerificationPassed = usePipelineStore((s) => s.generatedVerificationPassed);
   const frontendPreviewUrl = usePipelineStore((s) => s.frontendPreviewUrl);
+  const profile = usePipelineStore((s) => s.profile);
   const startTime = usePipelineStore((s) => s.startTime);
   const endTime = usePipelineStore((s) => s.endTime);
   const resetPipeline = usePipelineStore((s) => s.resetPipeline);
@@ -22,6 +24,7 @@ export function CompletionPanel() {
   const duration = startTime && endTime ? (endTime - startTime) / 1000 : 0;
   const lastRound = rounds[rounds.length - 1];
   const finalIssues = lastRound?.total ?? 0;
+  const profileDetails = PROFILE_DETAILS[profile];
 
   if (status === "error") {
     return (
@@ -43,13 +46,21 @@ export function CompletionPanel() {
     <div className="bg-gradient-to-br from-green-950/30 to-emerald-950/20 border border-green-800/50 rounded-2xl p-6 animate-fade-in">
       <div className="text-center mb-6">
         <div className="text-5xl mb-3">🎉</div>
-        <h3 className="text-xl font-bold text-white mb-1">프로젝트 생성 완료!</h3>
+        <h3 className="text-xl font-bold text-white mb-1">{profileDetails.completionTitle}</h3>
         <p className="text-sm text-gray-400">
-          {rounds.length}라운드 후 {finalIssues === 0 ? "모든 이슈가 해결되었습니다" : `${finalIssues}개 이슈 잔존`}
+          {profile === "full"
+            ? `${rounds.length}라운드 후 ${finalIssues === 0 ? "모든 이슈가 해결되었습니다" : `${finalIssues}개 이슈 잔존`}`
+            : profileDetails.completionSummary}
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6 sm:grid-cols-4">
+        <div className="text-center bg-gray-900/50 rounded-xl p-3">
+          <div className="text-2xl font-bold text-cyan-400">
+            {profileDetails.label}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">프로필</div>
+        </div>
         <div className="text-center bg-gray-900/50 rounded-xl p-3">
           <div className="text-2xl font-bold text-purple-400">
             {totalTokens.toLocaleString()}
@@ -57,8 +68,10 @@ export function CompletionPanel() {
           <div className="text-xs text-gray-500 mt-1">총 토큰</div>
         </div>
         <div className="text-center bg-gray-900/50 rounded-xl p-3">
-          <div className="text-2xl font-bold text-cyan-400">{rounds.length}</div>
-          <div className="text-xs text-gray-500 mt-1">반복 라운드</div>
+          <div className="text-2xl font-bold text-cyan-400">
+            {profile === "full" ? rounds.length : "Skip"}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">리뷰 라운드</div>
         </div>
         <div className="text-center bg-gray-900/50 rounded-xl p-3">
           <div className="text-2xl font-bold text-green-400">

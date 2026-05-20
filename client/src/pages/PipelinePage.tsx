@@ -10,6 +10,7 @@ import { CompletionPanel } from "../components/CompletionPanel.js";
 import { CostEstimate } from "../components/CostEstimate.js";
 import { SessionHistory } from "../components/SessionHistory.js";
 import type { AgentId } from "../types/index.js";
+import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 const ALL_AGENTS: AgentId[] = [
   "cto", "pm", "backend", "frontend", "qa", "security", "review",
@@ -63,6 +64,8 @@ function ActiveAgents() {
 export function PipelinePage() {
   const status = usePipelineStore((s) => s.status);
   const projectIdea = usePipelineStore((s) => s.projectIdea);
+  const profile = usePipelineStore((s) => s.profile);
+  const profileDetails = PROFILE_DETAILS[profile];
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-24 py-6">
@@ -78,9 +81,14 @@ export function PipelinePage() {
 
       {/* Current project context */}
       {status !== "idle" && projectIdea && (
-        <div className="mb-6 px-4 py-3 bg-gray-900 rounded-xl border border-gray-700 text-sm">
-          <span className="text-gray-500">Building: </span>
-          <span className="text-white font-medium">{projectIdea}</span>
+        <div className="mb-6 flex flex-col gap-2 bg-gray-900 rounded-xl border border-gray-700 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="text-gray-500">Building: </span>
+            <span className="text-white font-medium">{projectIdea}</span>
+          </div>
+          <span className="inline-flex w-fit items-center rounded-md border border-cyan-800/60 bg-cyan-950/30 px-2 py-1 text-xs font-medium text-cyan-300">
+            {profileDetails.label} · {profileDetails.description}
+          </span>
         </div>
       )}
 
