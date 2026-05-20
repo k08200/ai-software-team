@@ -19,6 +19,10 @@ const outputsDir = path.join(process.cwd(), "outputs");
 if (!fs.existsSync(outputsDir)) {
   fs.mkdirSync(outputsDir, { recursive: true });
 }
+const previewsDir = path.join(process.cwd(), "previews");
+if (!fs.existsSync(previewsDir)) {
+  fs.mkdirSync(previewsDir, { recursive: true });
+}
 
 // ── Rate limiters ────────────────────────────────────────────────────────────
 const pipelineLimiter = rateLimit({

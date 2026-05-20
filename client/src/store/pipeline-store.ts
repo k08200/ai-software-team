@@ -58,6 +58,7 @@ const initialState: PipelineState = {
   rounds: [],
   generatedVerification: [],
   generatedVerificationPassed: null,
+  frontendPreviewUrl: null,
   zipReady: false,
   errorMessage: null,
   startTime: null,
@@ -76,6 +77,7 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
       rounds: [],
       generatedVerification: [],
       generatedVerificationPassed: null,
+      frontendPreviewUrl: null,
       totalTokens: 0,
       zipReady: false,
       errorMessage: null,
@@ -226,6 +228,9 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
           generatedVerification: parseVerification(data.verification),
           generatedVerificationPassed: typeof data.verificationPassed === "boolean"
             ? data.verificationPassed
+            : null,
+          frontendPreviewUrl: typeof data.frontendPreviewUrl === "string"
+            ? data.frontendPreviewUrl
             : null,
           endTime: Date.now(),
         });

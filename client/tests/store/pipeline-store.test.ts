@@ -81,6 +81,7 @@ describe("usePipelineStore", () => {
     usePipelineStore.getState().handleSSEEvent("pipeline_complete", {
       totalTokens: 50000,
       verificationPassed: true,
+      frontendPreviewUrl: "/api/pipeline/app-preview/test-session/",
       verification: [
         {
           name: "Backend",
@@ -99,6 +100,7 @@ describe("usePipelineStore", () => {
     expect(state.zipReady).toBe(true);
     expect(state.totalTokens).toBe(50000);
     expect(state.generatedVerificationPassed).toBe(true);
+    expect(state.frontendPreviewUrl).toBe("/api/pipeline/app-preview/test-session/");
     expect(state.generatedVerification[0].commands[1].status).toBe("passed");
   });
 

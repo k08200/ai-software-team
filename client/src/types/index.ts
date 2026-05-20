@@ -73,6 +73,7 @@ export interface PipelineState {
   rounds: RoundData[];
   generatedVerification: GeneratedProjectVerification[];
   generatedVerificationPassed: boolean | null;
+  frontendPreviewUrl: string | null;
   zipReady: boolean;
   errorMessage: string | null;
   startTime: number | null;

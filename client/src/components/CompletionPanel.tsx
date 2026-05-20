@@ -1,4 +1,4 @@
-import { CheckCircle, MinusCircle, XCircle } from "lucide-react";
+import { CheckCircle, ExternalLink, MinusCircle, XCircle } from "lucide-react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 import { usePipeline } from "../hooks/usePipeline.js";
 import type { GeneratedVerificationCommand, VerificationStatus } from "../types/index.js";
@@ -10,6 +10,7 @@ export function CompletionPanel() {
   const rounds = usePipelineStore((s) => s.rounds);
   const generatedVerification = usePipelineStore((s) => s.generatedVerification);
   const generatedVerificationPassed = usePipelineStore((s) => s.generatedVerificationPassed);
+  const frontendPreviewUrl = usePipelineStore((s) => s.frontendPreviewUrl);
   const startTime = usePipelineStore((s) => s.startTime);
   const endTime = usePipelineStore((s) => s.endTime);
   const resetPipeline = usePipelineStore((s) => s.resetPipeline);
@@ -104,6 +105,15 @@ export function CompletionPanel() {
       )}
 
       <div className="flex gap-3">
+        {frontendPreviewUrl && (
+          <button
+            onClick={() => window.open(frontendPreviewUrl, "_blank", "noopener,noreferrer")}
+            className="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <ExternalLink size={16} aria-hidden="true" />
+            앱 미리보기
+          </button>
+        )}
         {zipReady && (
           <button
             onClick={download}

@@ -90,6 +90,7 @@ async function normalizeFrontend(projectDir: string): Promise<void> {
   }
 
   await removeMissingCssReferences(path.join(projectDir, "index.html"), projectDir);
+  await ensureFrontendEntryScript(path.join(projectDir, "index.html"));
   await removeMissingCssImports(path.join(projectDir, "src/main.tsx"), projectDir);
 }
 
@@ -139,6 +140,26 @@ async function removeMissingCssImports(filePath: string, projectDir: string): Pr
   if (nextSource !== source) {
     await fs.writeFile(filePath, nextSource, "utf-8");
   }
+}
+
+async function ensureFrontendEntryScript(htmlPath: string): Promise<void> {
+  let html: string;
+  try {
+    html = await fs.readFile(htmlPath, "utf-8");
+  } catch {
+    return;
+  }
+
+  if (/type=["']module["'][^>]+src=["']\/src\/main\.tsx["']/i.test(html)) {
+    return;
+  }
+
+  const script = '  <script type="module" src="/src/main.tsx"></script>';
+  const nextHtml = html.includes("</body>")
+    ? html.replace(/\s*<\/body>/i, `\n${script}\n</body>`)
+    : `${html.replace(/\s*$/, "")}\n${script}\n`;
+
+  await fs.writeFile(htmlPath, nextHtml, "utf-8");
 }
 
 async function normalizeBackendEntry(filePath: string): Promise<void> {

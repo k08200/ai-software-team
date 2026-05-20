@@ -10,6 +10,7 @@ import { authRequired } from "../middleware/auth.js";
 import { checkRunQuota, incrementRunCount, QuotaExceededError } from "../services/user-service.js";
 import { enqueue } from "../services/queue-service.js";
 import type { SSEEvent } from "../types.js";
+import { getFrontendPreviewDir } from "../utils/frontend-preview-publisher.js";
 
 const router = Router();
 
@@ -143,6 +144,42 @@ router.get("/preview/:sessionId/:filename", (req: Request, res: Response): void 
 
   res.sendFile(resolvedPath);
 });
+
+router.get("/app-preview/:sessionId", (req: Request, res: Response): void => {
+  serveFrontendPreview(req.params.sessionId, "index.html", res);
+});
+
+router.get("/app-preview/:sessionId/*", (req: Request, res: Response): void => {
+  serveFrontendPreview(req.params.sessionId, req.params[0] || "index.html", res);
+});
+
+function serveFrontendPreview(sessionId: string, requestedPath: string, res: Response): void {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    res.status(400).json({ error: "Invalid session ID." });
+    return;
+  }
+
+  const previewDir = getFrontendPreviewDir(sessionId);
+  const filePath = path.join(previewDir, requestedPath);
+  const resolvedPreviewDir = path.resolve(previewDir);
+  const resolvedPath = path.resolve(filePath);
+
+  if (resolvedPath !== resolvedPreviewDir && !resolvedPath.startsWith(`${resolvedPreviewDir}${path.sep}`)) {
+    res.status(403).json({ error: "Access denied." });
+    return;
+  }
+
+  const targetPath = fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()
+    ? resolvedPath
+    : path.join(previewDir, "index.html");
+
+  if (!fs.existsSync(targetPath)) {
+    res.status(404).json({ error: "Preview not found. Run verified generation first." });
+    return;
+  }
+
+  res.sendFile(targetPath);
+}
 
 router.get("/status", (_req: Request, res: Response): void => {
   res.json({

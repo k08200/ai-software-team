@@ -23,6 +23,7 @@ import {
   type ProjectVerification,
 } from "../utils/project-verifier.js";
 import { normalizeSmokeGeneratedProjects } from "../utils/smoke-project-normalizer.js";
+import { publishFrontendPreview } from "../utils/frontend-preview-publisher.js";
 import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = config.pipeline.maxRounds;
@@ -157,6 +158,9 @@ export class PipelineOrchestrator {
       const verification = await verifyGeneratedProjects(fileManager.getOutputDir());
       await this.saveSummary(fileManager, ctx, verification);
       const verificationPassed = this.generatedVerificationPassed(verification);
+      const frontendPreview = verificationPassed
+        ? await publishFrontendPreview(fileManager.getOutputDir(), sessionId)
+        : null;
 
       const finalIssues = ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0;
       const totalTokens = this.tokenTracker.getTotalTokens();
@@ -187,6 +191,7 @@ export class PipelineOrchestrator {
           finalIssues,
           verification,
           verificationPassed,
+          frontendPreviewUrl: frontendPreview?.url,
           zipPath: relativePath,
           sessionId,
           duration,

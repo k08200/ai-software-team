@@ -48,6 +48,7 @@ describe("normalizeSmokeGeneratedProjects", () => {
     expect(backendSource).toContain("Server is running on port ${PORT}");
     expect(backendSource).toContain("});");
     expect(html).not.toContain("tailwind.css");
+    expect(html).toContain('<script type="module" src="/src/main.tsx"></script>');
     expect(source).not.toContain("missing.css");
   });
 });

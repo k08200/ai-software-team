@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const OUTPUT_DIR = path.join(process.cwd(), "outputs");
+const PREVIEW_DIR = path.join(process.cwd(), "previews");
 const TTL_HOURS = parseInt(process.env.OUTPUT_TTL_HOURS ?? "24", 10);
 const TTL_MS = TTL_HOURS * 60 * 60 * 1000;
 
@@ -9,22 +10,34 @@ const TTL_MS = TTL_HOURS * 60 * 60 * 1000;
  * Delete output directories and zip files older than OUTPUT_TTL_HOURS.
  */
 export async function cleanupOldOutputs(): Promise<{ deleted: number; errors: number }> {
+  const outputResult = await cleanupDir(OUTPUT_DIR, "output", (entry) => entry === "sessions.json");
+  const previewResult = await cleanupDir(PREVIEW_DIR, "preview");
+  return {
+    deleted: outputResult.deleted + previewResult.deleted,
+    errors: outputResult.errors + previewResult.errors,
+  };
+}
+
+async function cleanupDir(
+  rootDir: string,
+  label: string,
+  skip: (entry: string) => boolean = () => false,
+): Promise<{ deleted: number; errors: number }> {
   let deleted = 0;
   let errors = 0;
   const now = Date.now();
 
   let entries: string[];
   try {
-    entries = await fs.readdir(OUTPUT_DIR);
+    entries = await fs.readdir(rootDir);
   } catch {
     return { deleted, errors };
   }
 
   for (const entry of entries) {
-    // Skip sessions.json
-    if (entry === "sessions.json") continue;
+    if (skip(entry)) continue;
 
-    const fullPath = path.join(OUTPUT_DIR, entry);
+    const fullPath = path.join(rootDir, entry);
     try {
       const stat = await fs.stat(fullPath);
       const ageMs = now - stat.mtimeMs;
@@ -32,7 +45,7 @@ export async function cleanupOldOutputs(): Promise<{ deleted: number; errors: nu
       if (ageMs > TTL_MS) {
         await fs.rm(fullPath, { recursive: true, force: true });
         deleted++;
-        console.log(`[Cleanup] Deleted old output: ${entry} (age: ${Math.round(ageMs / 3600000)}h)`);
+        console.log(`[Cleanup] Deleted old ${label}: ${entry} (age: ${Math.round(ageMs / 3600000)}h)`);
       }
     } catch {
       errors++;
