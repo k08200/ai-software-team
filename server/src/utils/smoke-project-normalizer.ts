@@ -64,6 +64,7 @@ async function normalizeBackend(projectDir: string): Promise<void> {
   };
 
   await writePackageJson(packageJsonPath, packageJson);
+  await normalizeBackendEntry(path.join(projectDir, "src/index.ts"));
 }
 
 async function normalizeFrontend(projectDir: string): Promise<void> {
@@ -134,6 +135,35 @@ async function removeMissingCssImports(filePath: string, projectDir: string): Pr
     /^import\s+["']([^"']+\.css)["'];?\s*$/gm,
     (line, importPath: string) => cssFileExists(projectDir, importPath) ? line : "",
   );
+
+  if (nextSource !== source) {
+    await fs.writeFile(filePath, nextSource, "utf-8");
+  }
+}
+
+async function normalizeBackendEntry(filePath: string): Promise<void> {
+  let source: string;
+  try {
+    source = await fs.readFile(filePath, "utf-8");
+  } catch {
+    return;
+  }
+
+  const listenBlock = [
+    "const PORT = Number(process.env.PORT ?? 3000);",
+    "app.listen(PORT, () => {",
+    "  console.log(`Server is running on port ${PORT}`);",
+    "});",
+    "",
+  ].join("\n");
+
+  let nextSource = source;
+  const portIndex = source.search(/\nconst\s+PORT\s*=/);
+  if (portIndex >= 0) {
+    nextSource = source.slice(0, portIndex + 1) + listenBlock;
+  } else if (!source.includes("app.listen(")) {
+    nextSource = `${source.replace(/\s*$/, "\n\n")}${listenBlock}`;
+  }
 
   if (nextSource !== source) {
     await fs.writeFile(filePath, nextSource, "utf-8");
