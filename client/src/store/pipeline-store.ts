@@ -4,7 +4,9 @@ import type {
   AgentId,
   AgentState,
   AgentStatus,
+  GeneratedProjectVerification,
   RoundData,
+  VerificationStatus,
 } from "../types/index.js";
 
 const AGENTS: Record<AgentId, Pick<AgentState, "id" | "name" | "emoji" | "color">> = {
@@ -54,6 +56,8 @@ const initialState: PipelineState = {
   totalTokens: 0,
   agents: makeInitialAgents(),
   rounds: [],
+  generatedVerification: [],
+  generatedVerificationPassed: null,
   zipReady: false,
   errorMessage: null,
   startTime: null,
@@ -70,6 +74,8 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
       status: "running",
       agents: makeInitialAgents(),
       rounds: [],
+      generatedVerification: [],
+      generatedVerificationPassed: null,
       totalTokens: 0,
       zipReady: false,
       errorMessage: null,
@@ -217,6 +223,10 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
           status: "completed",
           zipReady: true,
           totalTokens: (data.totalTokens as number) ?? 0,
+          generatedVerification: parseVerification(data.verification),
+          generatedVerificationPassed: typeof data.verificationPassed === "boolean"
+            ? data.verificationPassed
+            : null,
           endTime: Date.now(),
         });
         break;
@@ -231,3 +241,36 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
     }
   },
 }));
+
+function parseVerification(value: unknown): GeneratedProjectVerification[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((project): project is Record<string, unknown> => !!project && typeof project === "object")
+    .map((project) => ({
+      name: typeof project.name === "string" ? project.name : "Project",
+      relativePath: typeof project.relativePath === "string" ? project.relativePath : "",
+      fileCount: typeof project.fileCount === "number" ? project.fileCount : 0,
+      hasPackageJson: project.hasPackageJson === true,
+      commands: parseCommands(project.commands),
+    }));
+}
+
+function parseCommands(value: unknown): GeneratedProjectVerification["commands"] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((command): command is Record<string, unknown> => !!command && typeof command === "object")
+    .map((command) => ({
+      command: typeof command.command === "string" ? command.command : "command",
+      status: parseStatus(command.status),
+      durationMs: typeof command.durationMs === "number" ? command.durationMs : 0,
+      exitCode: typeof command.exitCode === "number" ? command.exitCode : undefined,
+      output: typeof command.output === "string" ? command.output : undefined,
+      reason: typeof command.reason === "string" ? command.reason : undefined,
+    }));
+}
+
+function parseStatus(value: unknown): VerificationStatus {
+  return value === "passed" || value === "failed" || value === "skipped" ? value : "skipped";
+}

@@ -43,6 +43,25 @@ export interface RoundData {
   completed: boolean;
 }
 
+export type VerificationStatus = "passed" | "failed" | "skipped";
+
+export interface GeneratedVerificationCommand {
+  command: string;
+  status: VerificationStatus;
+  durationMs: number;
+  exitCode?: number;
+  output?: string;
+  reason?: string;
+}
+
+export interface GeneratedProjectVerification {
+  name: string;
+  relativePath: string;
+  fileCount: number;
+  hasPackageJson: boolean;
+  commands: GeneratedVerificationCommand[];
+}
+
 export interface PipelineState {
   status: PipelineStatus;
   projectIdea: string;
@@ -52,6 +71,8 @@ export interface PipelineState {
   totalTokens: number;
   agents: Record<AgentId, AgentState>;
   rounds: RoundData[];
+  generatedVerification: GeneratedProjectVerification[];
+  generatedVerificationPassed: boolean | null;
   zipReady: boolean;
   errorMessage: string | null;
   startTime: number | null;

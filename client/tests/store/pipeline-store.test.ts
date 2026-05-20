@@ -80,11 +80,26 @@ describe("usePipelineStore", () => {
   it("handles pipeline_complete event", () => {
     usePipelineStore.getState().handleSSEEvent("pipeline_complete", {
       totalTokens: 50000,
+      verificationPassed: true,
+      verification: [
+        {
+          name: "Backend",
+          relativePath: "generated/backend",
+          fileCount: 3,
+          hasPackageJson: true,
+          commands: [
+            { command: "npm install", status: "passed", durationMs: 100 },
+            { command: "npm run build", status: "passed", durationMs: 200 },
+          ],
+        },
+      ],
     });
     const state = usePipelineStore.getState();
     expect(state.status).toBe("completed");
     expect(state.zipReady).toBe(true);
     expect(state.totalTokens).toBe(50000);
+    expect(state.generatedVerificationPassed).toBe(true);
+    expect(state.generatedVerification[0].commands[1].status).toBe("passed");
   });
 
   it("handles pipeline_error event", () => {

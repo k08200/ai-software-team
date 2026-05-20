@@ -156,6 +156,7 @@ export class PipelineOrchestrator {
 
       const verification = await verifyGeneratedProjects(fileManager.getOutputDir());
       await this.saveSummary(fileManager, ctx, verification);
+      const verificationPassed = this.generatedVerificationPassed(verification);
 
       const finalIssues = ctx.rounds[ctx.rounds.length - 1]?.issues.total ?? 0;
       const totalTokens = this.tokenTracker.getTotalTokens();
@@ -184,6 +185,8 @@ export class PipelineOrchestrator {
           tokenSummary: this.tokenTracker.getSummary(),
           roundCount: ctx.rounds.length,
           finalIssues,
+          verification,
+          verificationPassed,
           zipPath: relativePath,
           sessionId,
           duration,
@@ -483,5 +486,14 @@ ${((Date.now() - ctx.startTime) / 1000).toFixed(1)}s
 `;
 
     await fileManager.saveFile("SUMMARY.md", summary);
+  }
+
+  private generatedVerificationPassed(verification: ProjectVerification[]): boolean {
+    return verification.every((project) => {
+      if (!project.hasPackageJson) return false;
+      const install = project.commands.find((command) => command.command === "npm install");
+      const build = project.commands.find((command) => command.command === "npm run build");
+      return install?.status === "passed" && build?.status === "passed";
+    });
   }
 }

@@ -1,11 +1,15 @@
+import { CheckCircle, MinusCircle, XCircle } from "lucide-react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 import { usePipeline } from "../hooks/usePipeline.js";
+import type { GeneratedVerificationCommand, VerificationStatus } from "../types/index.js";
 
 export function CompletionPanel() {
   const status = usePipelineStore((s) => s.status);
   const zipReady = usePipelineStore((s) => s.zipReady);
   const totalTokens = usePipelineStore((s) => s.totalTokens);
   const rounds = usePipelineStore((s) => s.rounds);
+  const generatedVerification = usePipelineStore((s) => s.generatedVerification);
+  const generatedVerificationPassed = usePipelineStore((s) => s.generatedVerificationPassed);
   const startTime = usePipelineStore((s) => s.startTime);
   const endTime = usePipelineStore((s) => s.endTime);
   const resetPipeline = usePipelineStore((s) => s.resetPipeline);
@@ -65,6 +69,40 @@ export function CompletionPanel() {
         </div>
       </div>
 
+      {generatedVerification.length > 0 && (
+        <div className="mb-6 bg-gray-950/40 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h4 className="text-sm font-semibold text-white">Generated Build Checks</h4>
+            <span className={`text-xs font-medium ${generatedVerificationPassed ? "text-green-400" : "text-amber-300"}`}>
+              {generatedVerificationPassed ? "All checks passed" : "Review required"}
+            </span>
+          </div>
+          <div className="space-y-3">
+            {generatedVerification.map((project) => (
+              <div key={project.relativePath} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div>
+                    <div className="text-sm font-medium text-gray-100">{project.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {project.fileCount} files · package.json {project.hasPackageJson ? "found" : "missing"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {["npm install", "npm run build", "npm test"].map((command) => (
+                    <VerificationBadge
+                      key={command}
+                      command={command}
+                      result={project.commands.find((item) => item.command === command)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-3">
         {zipReady && (
           <button
@@ -84,4 +122,35 @@ export function CompletionPanel() {
       </div>
     </div>
   );
+}
+
+function VerificationBadge({
+  command,
+  result,
+}: {
+  command: string;
+  result?: GeneratedVerificationCommand;
+}) {
+  const status = result?.status ?? "skipped";
+  const Icon = status === "passed" ? CheckCircle : status === "failed" ? XCircle : MinusCircle;
+  const label = status === "passed" ? "Passed" : status === "failed" ? "Failed" : "Skipped";
+  const color = getStatusColor(status);
+
+  return (
+    <div className={`flex min-h-12 items-center gap-2 rounded-md border px-2.5 py-2 ${color}`}>
+      <Icon size={15} aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="truncate text-xs font-medium">{command.replace("npm ", "")}</div>
+        <div className="truncate text-[11px] opacity-80">
+          {result?.reason ?? label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getStatusColor(status: VerificationStatus): string {
+  if (status === "passed") return "border-green-800/70 bg-green-950/30 text-green-300";
+  if (status === "failed") return "border-red-800/70 bg-red-950/30 text-red-300";
+  return "border-gray-700 bg-gray-900/70 text-gray-400";
 }
