@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config, type PipelineProfile } from "../config.js";
 
 const BACKEND_FIX_PROMPT = `You are a Senior Backend Engineer performing code fixes.
 
@@ -57,13 +58,14 @@ STRICT FILE OUTPUT CONTRACT:
 - Do not include prose between files, summaries, or directory trees outside code blocks.`;
 
 export class BackendFixAgent extends BaseAgent {
-  constructor() {
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "backend",
       agentName: "Backend Fix Agent",
       systemPrompt: BACKEND_FIX_PROMPT,
       maxTokens: 16000,
       thinkingBudget: 6000,
+      profile,
     });
   }
 
@@ -96,13 +98,14 @@ Fix ALL issues listed above. Return the complete fixed backend code.`;
 }
 
 export class FrontendFixAgent extends BaseAgent {
-  constructor() {
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "frontend",
       agentName: "Frontend Fix Agent",
       systemPrompt: FRONTEND_FIX_PROMPT,
       maxTokens: 16000,
       thinkingBudget: 6000,
+      profile,
     });
   }
 

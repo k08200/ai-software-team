@@ -1,5 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
-import { config } from "../config.js";
+import { config, type PipelineProfile } from "../config.js";
 
 const SYSTEM_PROMPT = `You are the Product Manager of an elite software engineering team. You translate technical architecture into actionable product requirements.
 
@@ -61,18 +61,22 @@ For each Must Have feature, define measurable acceptance criteria.
 Be exhaustive. Backend and Frontend agents will use this as their sole specification.`;
 
 export class PMAgent extends BaseAgent {
-  constructor() {
+  private readonly runtimeProfile: PipelineProfile;
+
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "pm",
       agentName: "PM Agent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 16000,
       thinkingBudget: 8000,
+      profile,
     });
+    this.runtimeProfile = profile;
   }
 
   buildPrompt(projectIdea: string, architecture: string): string {
-    if (config.pipeline.profile === "mvp") {
+    if (this.runtimeProfile === "mvp") {
       return `Product Idea: "${projectIdea}"
 
 ## Technical Architecture (from CTO):

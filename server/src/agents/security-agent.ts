@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config, type PipelineProfile } from "../config.js";
 
 const SYSTEM_PROMPT = `You are a Senior Security Engineer. You review code against OWASP Top 10 and security best practices.
 
@@ -34,13 +35,14 @@ IMPORTANT: You MUST respond with valid JSON matching this exact schema:
 Check ALL OWASP Top 10 categories. Be specific. If clean, return issues: [].`;
 
 export class SecurityAgent extends BaseAgent {
-  constructor() {
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "security",
       agentName: "Security Agent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 8000,
       thinkingBudget: 5000,
+      profile,
     });
   }
 

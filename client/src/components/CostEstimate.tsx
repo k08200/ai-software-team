@@ -18,15 +18,16 @@ function fmt(usd: number): string {
 
 export function CostEstimate() {
   const status = usePipelineStore((s) => s.status);
+  const profile = usePipelineStore((s) => s.profile);
   const [estimate, setEstimate] = useState<EstimateData | null>(null);
 
   useEffect(() => {
     if (status !== "idle") return;
-    fetch("/api/pipeline/estimate")
+    fetch(`/api/pipeline/estimate?profile=${profile}`)
       .then((r) => r.json())
       .then((data: EstimateData) => setEstimate(data))
       .catch(() => {}); // Non-critical
-  }, [status]);
+  }, [profile, status]);
 
   if (!estimate || status !== "idle") return null;
 

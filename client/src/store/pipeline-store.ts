@@ -5,6 +5,7 @@ import type {
   AgentState,
   AgentStatus,
   GeneratedProjectVerification,
+  PipelineProfile,
   RoundData,
   VerificationStatus,
 } from "../types/index.js";
@@ -40,6 +41,7 @@ function makeInitialAgents(): Record<AgentId, AgentState> {
 
 interface PipelineActions {
   setProjectIdea: (idea: string) => void;
+  setProfile: (profile: PipelineProfile) => void;
   startPipeline: () => void;
   resetPipeline: () => void;
   handleSSEEvent: (type: string, data: Record<string, unknown>) => void;
@@ -49,6 +51,7 @@ interface PipelineActions {
 
 const initialState: PipelineState = {
   status: "idle",
+  profile: "mvp",
   projectIdea: "",
   sessionId: null,
   currentAgent: null,
@@ -69,6 +72,7 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
   ...initialState,
 
   setProjectIdea: (idea) => set({ projectIdea: idea }),
+  setProfile: (profile) => set({ profile }),
 
   startPipeline: () =>
     set({
@@ -117,6 +121,7 @@ export const usePipelineStore = create<PipelineState & PipelineActions>((set, ge
         set({
           sessionId: data.sessionId as string,
           status: "running",
+          profile: parseProfile(data.profile, state.profile),
         });
         break;
 
@@ -278,4 +283,8 @@ function parseCommands(value: unknown): GeneratedProjectVerification["commands"]
 
 function parseStatus(value: unknown): VerificationStatus {
   return value === "passed" || value === "failed" || value === "skipped" ? value : "skipped";
+}
+
+function parseProfile(value: unknown, fallback: PipelineProfile): PipelineProfile {
+  return value === "smoke" || value === "mvp" || value === "full" ? value : fallback;
 }

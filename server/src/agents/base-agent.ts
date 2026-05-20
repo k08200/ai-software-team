@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentConfig, AgentOutput, AgentId } from "../types.js";
-import { config as appConfig } from "../config.js";
+import { config as appConfig, type PipelineProfile } from "../config.js";
 import { getDemoThinking, getDemoResponse, type DemoAgentId } from "../utils/demo-data.js";
 
 export type StreamCallback = (event: {
@@ -14,8 +14,6 @@ const MODEL = appConfig.llm.model;
 const THINKING_BUDGET = parseInt(process.env.THINKING_BUDGET ?? "8000", 10);
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 const LLM_PROVIDER = appConfig.llm.provider;
-const PIPELINE_PROFILE = appConfig.pipeline.profile;
-const IS_COMPACT_PROFILE = PIPELINE_PROFILE === "smoke" || PIPELINE_PROFILE === "mvp";
 
 // Fake token counts for demo — realistic-looking numbers
 const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
@@ -33,17 +31,24 @@ const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
 export abstract class BaseAgent {
   protected client?: Anthropic;
   readonly config: AgentConfig;
+  private readonly profile: PipelineProfile;
 
-  constructor(config: Omit<AgentConfig, "model" | "thinkingBudget"> & { model?: string; thinkingBudget?: number }) {
+  constructor(config: Omit<AgentConfig, "model" | "thinkingBudget"> & {
+    model?: string;
+    thinkingBudget?: number;
+    profile?: PipelineProfile;
+  }) {
     if (LLM_PROVIDER === "anthropic") {
       this.client = new Anthropic({
         apiKey: appConfig.anthropic.apiKey,
       });
     }
+    const { profile = appConfig.pipeline.profile, ...agentConfig } = config;
+    this.profile = profile;
     this.config = {
-      ...config,
+      ...agentConfig,
       model: config.model ?? MODEL,
-      maxTokens: getProfileMaxTokens(config.maxTokens),
+      maxTokens: getProfileMaxTokens(profile, config.maxTokens),
       thinkingBudget: config.thinkingBudget ?? THINKING_BUDGET,
     };
   }
@@ -53,8 +58,8 @@ export abstract class BaseAgent {
     onStream: StreamCallback,
     round?: number,
   ): Promise<AgentOutput> {
-    const effectiveMessage = IS_COMPACT_PROFILE
-      ? `${userMessage}\n\n${getProfileInstruction()}`
+    const effectiveMessage = isCompactProfile(this.profile)
+      ? `${userMessage}\n\n${getProfileInstruction(this.profile)}`
       : userMessage;
 
     if (DEMO_MODE) {
@@ -262,18 +267,22 @@ export abstract class BaseAgent {
   }
 }
 
-function getProfileMaxTokens(agentMaxTokens: number): number {
-  if (PIPELINE_PROFILE === "smoke") {
+function isCompactProfile(profile: PipelineProfile): boolean {
+  return profile === "smoke" || profile === "mvp";
+}
+
+function getProfileMaxTokens(profile: PipelineProfile, agentMaxTokens: number): number {
+  if (profile === "smoke") {
     return Math.min(agentMaxTokens, appConfig.pipeline.smokeMaxTokens);
   }
-  if (PIPELINE_PROFILE === "mvp") {
+  if (profile === "mvp") {
     return Math.min(agentMaxTokens, appConfig.pipeline.mvpMaxTokens);
   }
   return agentMaxTokens;
 }
 
-function getProfileInstruction(): string {
-  if (PIPELINE_PROFILE === "mvp") {
+function getProfileInstruction(profile: PipelineProfile): string {
+  if (profile === "mvp") {
     return [
       "MVP MODE: Keep the response compact, implementation-first, and focused on one polished vertical slice.",
       "Prefer a small, complete, runnable product over broad architecture.",

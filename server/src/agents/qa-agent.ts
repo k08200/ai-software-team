@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config, type PipelineProfile } from "../config.js";
 
 const SYSTEM_PROMPT = `You are a Senior QA Engineer. You review code for bugs, missing tests, and quality issues.
 
@@ -32,13 +33,14 @@ Review criteria:
 If no issues found, return: {"round": N, "summary": "...", "issues": [], "missingTests": [], "requirementsGaps": [], "totalIssues": 0}`;
 
 export class QAAgent extends BaseAgent {
-  constructor() {
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "qa",
       agentName: "QA Agent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 8000,
       thinkingBudget: 5000,
+      profile,
     });
   }
 

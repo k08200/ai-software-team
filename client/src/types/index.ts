@@ -20,6 +20,8 @@ export type PipelineStatus =
   | "completed"
   | "error";
 
+export type PipelineProfile = "smoke" | "mvp" | "full";
+
 export interface AgentState {
   id: AgentId;
   name: string;
@@ -64,6 +66,7 @@ export interface GeneratedProjectVerification {
 
 export interface PipelineState {
   status: PipelineStatus;
+  profile: PipelineProfile;
   projectIdea: string;
   sessionId: string | null;
   currentAgent: AgentId | null;

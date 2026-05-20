@@ -12,6 +12,7 @@ export function usePipeline() {
     async (idea: string) => {
       if (store.status === "running") return;
 
+      const profile = store.profile;
       store.startPipeline();
 
       // Close existing SSE connection
@@ -29,7 +30,7 @@ export function usePipeline() {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ idea }),
+          body: JSON.stringify({ idea, profile }),
           signal: abortControllerRef.current.signal,
         });
 

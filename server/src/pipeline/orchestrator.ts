@@ -16,7 +16,7 @@ import { FileManager } from "../utils/file-manager.js";
 import { countIssues } from "../utils/issue-extractor.js";
 import { estimateCost } from "../utils/cost-estimator.js";
 import { saveSession } from "../utils/session-store.js";
-import { config } from "../config.js";
+import { config, type PipelineProfile } from "../config.js";
 import {
   formatVerificationReport,
   verifyGeneratedProjects,
@@ -28,19 +28,36 @@ import type { StreamCallback } from "../agents/base-agent.js";
 
 const MAX_ROUNDS = config.pipeline.maxRounds;
 const MIN_ROUNDS = config.pipeline.minRounds;
-const SKIPS_REVIEW_ROUNDS = config.pipeline.profile === "smoke" || config.pipeline.profile === "mvp";
+
+interface PipelineOrchestratorOptions {
+  profile?: PipelineProfile;
+}
 
 export class PipelineOrchestrator {
-  private ctoAgent = new CTOAgent();
-  private pmAgent = new PMAgent();
-  private backendAgent = new BackendAgent();
-  private frontendAgent = new FrontendAgent();
-  private qaAgent = new QAAgent();
-  private securityAgent = new SecurityAgent();
-  private reviewAgent = new ReviewAgent();
-  private backendFixAgent = new BackendFixAgent();
-  private frontendFixAgent = new FrontendFixAgent();
+  private readonly profile: PipelineProfile;
+  private readonly ctoAgent: CTOAgent;
+  private readonly pmAgent: PMAgent;
+  private readonly backendAgent: BackendAgent;
+  private readonly frontendAgent: FrontendAgent;
+  private readonly qaAgent: QAAgent;
+  private readonly securityAgent: SecurityAgent;
+  private readonly reviewAgent: ReviewAgent;
+  private readonly backendFixAgent: BackendFixAgent;
+  private readonly frontendFixAgent: FrontendFixAgent;
   private tokenTracker = new TokenTracker();
+
+  constructor(options: PipelineOrchestratorOptions = {}) {
+    this.profile = options.profile ?? config.pipeline.profile;
+    this.ctoAgent = new CTOAgent(this.profile);
+    this.pmAgent = new PMAgent(this.profile);
+    this.backendAgent = new BackendAgent(this.profile);
+    this.frontendAgent = new FrontendAgent(this.profile);
+    this.qaAgent = new QAAgent(this.profile);
+    this.securityAgent = new SecurityAgent(this.profile);
+    this.reviewAgent = new ReviewAgent(this.profile);
+    this.backendFixAgent = new BackendFixAgent(this.profile);
+    this.frontendFixAgent = new FrontendFixAgent(this.profile);
+  }
 
   async run(
     projectIdea: string,
@@ -60,7 +77,7 @@ export class PipelineOrchestrator {
     };
 
     // Emit cost estimate upfront
-    const estimatedRounds = SKIPS_REVIEW_ROUNDS ? 0 : MAX_ROUNDS;
+    const estimatedRounds = this.skipsReviewRounds() ? 0 : MAX_ROUNDS;
     const costEstimate = estimateCost(
       config.llm.model,
       estimatedRounds,
@@ -68,7 +85,7 @@ export class PipelineOrchestrator {
     );
     emit({
       type: "pipeline_start",
-      data: { projectIdea, sessionId, profile: config.pipeline.profile, costEstimate },
+      data: { projectIdea, sessionId, profile: this.profile, costEstimate },
     });
 
     await saveSession({
@@ -120,7 +137,7 @@ export class PipelineOrchestrator {
         (o) => fileManager.saveAgentOutput(o),
       );
 
-      if (SKIPS_REVIEW_ROUNDS) {
+      if (this.skipsReviewRounds()) {
         emit({
           type: "round_complete",
           data: {
@@ -128,7 +145,7 @@ export class PipelineOrchestrator {
             totalIssues: 0,
             applying_fixes: false,
             skipped: true,
-            reason: `PIPELINE_PROFILE=${config.pipeline.profile}`,
+            reason: `PIPELINE_PROFILE=${this.profile}`,
           },
         });
       } else {
@@ -152,7 +169,7 @@ export class PipelineOrchestrator {
         ),
       ]);
 
-      if (SKIPS_REVIEW_ROUNDS) {
+      if (this.skipsReviewRounds()) {
         await normalizeSmokeGeneratedProjects(fileManager.getOutputDir());
       }
 
@@ -478,7 +495,7 @@ ${Object.entries(this.tokenTracker.getSummary())
   .join("\n")}
 
 ## Iteration Rounds
-Profile: ${config.pipeline.profile}
+Profile: ${this.profile}
 
 ${roundSummary}
 
@@ -501,5 +518,9 @@ ${((Date.now() - ctx.startTime) / 1000).toFixed(1)}s
       const build = project.commands.find((command) => command.command === "npm run build");
       return install?.status === "passed" && build?.status === "passed";
     });
+  }
+
+  private skipsReviewRounds(): boolean {
+    return this.profile === "smoke" || this.profile === "mvp";
   }
 }

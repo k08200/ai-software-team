@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { PipelineOrchestrator } from "../pipeline/orchestrator.js";
 import { estimateCost } from "../utils/cost-estimator.js";
-import { config } from "../config.js";
+import { config, parsePipelineProfile } from "../config.js";
 import { saveSession, getSessions, getSession } from "../utils/session-store.js";
 import { authRequired } from "../middleware/auth.js";
 import { checkRunQuota, incrementRunCount, QuotaExceededError } from "../services/user-service.js";
@@ -25,10 +25,17 @@ router.post("/run", authRequired, async (req: Request, res: Response): Promise<v
     return;
   }
 
-  const { idea } = req.body as { idea?: string };
+  const { idea, profile: requestedProfile } = req.body as { idea?: string; profile?: unknown };
+  const profile = requestedProfile === undefined
+    ? config.pipeline.profile
+    : parsePipelineProfile(requestedProfile);
 
   if (!idea || typeof idea !== "string" || idea.trim().length < 5) {
     res.status(400).json({ error: "Project idea must be at least 5 characters." });
+    return;
+  }
+  if (!profile) {
+    res.status(400).json({ error: "Pipeline profile must be one of: full, mvp, smoke." });
     return;
   }
 
@@ -70,7 +77,7 @@ router.post("/run", authRequired, async (req: Request, res: Response): Promise<v
     res.write(": heartbeat\n\n");
   }, 15000);
 
-  const orchestrator = new PipelineOrchestrator();
+  const orchestrator = new PipelineOrchestrator({ profile });
   const userId = req.user.id;
 
   try {
@@ -195,10 +202,12 @@ router.get("/status", (_req: Request, res: Response): void => {
 router.get("/estimate", (req: Request, res: Response): void => {
   const provider = (req.query.provider as string) ?? config.llm.provider;
   const model = (req.query.model as string) ?? config.llm.model;
-  const rounds = parseInt((req.query.rounds as string) ?? process.env.MAX_ROUNDS ?? "3", 10);
+  const profile = parsePipelineProfile(req.query.profile) ?? config.pipeline.profile;
+  const defaultRounds = profile === "full" ? process.env.MAX_ROUNDS ?? "3" : "0";
+  const rounds = parseInt((req.query.rounds as string) ?? defaultRounds, 10);
 
-  if (isNaN(rounds) || rounds < 1 || rounds > 10) {
-    res.status(400).json({ error: "rounds must be between 1 and 10" });
+  if (isNaN(rounds) || rounds < 0 || rounds > 10) {
+    res.status(400).json({ error: "rounds must be between 0 and 10" });
     return;
   }
 

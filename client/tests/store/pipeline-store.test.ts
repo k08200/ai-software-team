@@ -7,10 +7,16 @@ describe("usePipelineStore", () => {
   });
 
   it("initializes in idle state", () => {
-    const { status, totalTokens, rounds } = usePipelineStore.getState();
+    const { status, profile, totalTokens, rounds } = usePipelineStore.getState();
     expect(status).toBe("idle");
+    expect(profile).toBe("mvp");
     expect(totalTokens).toBe(0);
     expect(rounds).toHaveLength(0);
+  });
+
+  it("sets the selected pipeline profile", () => {
+    usePipelineStore.getState().setProfile("smoke");
+    expect(usePipelineStore.getState().profile).toBe("smoke");
   });
 
   it("transitions to running on startPipeline", () => {
@@ -102,6 +108,16 @@ describe("usePipelineStore", () => {
     expect(state.generatedVerificationPassed).toBe(true);
     expect(state.frontendPreviewUrl).toBe("/api/pipeline/app-preview/test-session/");
     expect(state.generatedVerification[0].commands[1].status).toBe("passed");
+  });
+
+  it("keeps profile from pipeline_start event", () => {
+    usePipelineStore.getState().setProfile("smoke");
+    usePipelineStore.getState().handleSSEEvent("pipeline_start", {
+      sessionId: "session-1",
+      profile: "full",
+    });
+
+    expect(usePipelineStore.getState().profile).toBe("full");
   });
 
   it("handles pipeline_error event", () => {

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { usePipelineStore } from "../store/pipeline-store.js";
 import { usePipeline } from "../hooks/usePipeline.js";
+import type { PipelineProfile } from "../types/index.js";
 
 const EXAMPLES = [
   "할 일 앱 만들어줘",
@@ -10,12 +11,36 @@ const EXAMPLES = [
   "개인 블로그 플랫폼",
 ];
 
+const PROFILE_OPTIONS: Array<{
+  id: PipelineProfile;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "mvp",
+    label: "MVP",
+    description: "아이디어 맞춤 앱, 로컬 추천",
+  },
+  {
+    id: "smoke",
+    label: "Smoke",
+    description: "연결/ZIP 빠른 확인",
+  },
+  {
+    id: "full",
+    label: "Full",
+    description: "전체 리뷰 라운드",
+  },
+];
+
 export function IdeaInput() {
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const { run, cancel } = usePipeline();
   const status = usePipelineStore((s) => s.status);
+  const profile = usePipelineStore((s) => s.profile);
   const setProjectIdea = usePipelineStore((s) => s.setProjectIdea);
+  const setProfile = usePipelineStore((s) => s.setProfile);
 
   const isRunning = status === "running";
 
@@ -70,6 +95,34 @@ export function IdeaInput() {
           <p id="input-error" className="text-red-400 text-xs" role="alert">
             {error}
           </p>
+        )}
+
+        {!isRunning && (
+          <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Pipeline profile">
+            {PROFILE_OPTIONS.map((option) => {
+              const selected = profile === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setProfile(option.id)}
+                  className={[
+                    "min-h-[72px] rounded-xl border px-3 py-2 text-left transition-colors",
+                    selected
+                      ? "border-cyan-500 bg-cyan-500/10 text-white"
+                      : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-500 hover:bg-gray-700/60",
+                  ].join(" ")}
+                >
+                  <span className="block text-sm font-semibold">{option.label}</span>
+                  <span className="mt-1 block text-[11px] leading-4 text-gray-500">
+                    {option.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         )}
 
         {/* Example chips */}

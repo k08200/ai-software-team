@@ -1,4 +1,5 @@
 import { BaseAgent } from "./base-agent.js";
+import { config, type PipelineProfile } from "../config.js";
 
 const SYSTEM_PROMPT = `You are a Principal Engineer doing code review.
 
@@ -34,13 +35,14 @@ Review criteria:
 If no issues: return issues: [], totalIssues: 0`;
 
 export class ReviewAgent extends BaseAgent {
-  constructor() {
+  constructor(profile: PipelineProfile = config.pipeline.profile) {
     super({
       agentId: "review",
       agentName: "Review Agent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 8000,
       thinkingBudget: 5000,
+      profile,
     });
   }
 

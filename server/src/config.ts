@@ -33,8 +33,17 @@ function optionalChoice<const T extends readonly string[]>(
   return val as T[number];
 }
 
+export const PIPELINE_PROFILES = ["full", "mvp", "smoke"] as const;
+export type PipelineProfile = (typeof PIPELINE_PROFILES)[number];
+
+export function parsePipelineProfile(value: unknown): PipelineProfile | null {
+  return typeof value === "string" && PIPELINE_PROFILES.includes(value as PipelineProfile)
+    ? value as PipelineProfile
+    : null;
+}
+
 const llmProvider = optionalChoice("LLM_PROVIDER", "ollama", ["ollama", "anthropic"] as const);
-const pipelineProfile = optionalChoice("PIPELINE_PROFILE", "full", ["full", "mvp", "smoke"] as const);
+const pipelineProfile = optionalChoice("PIPELINE_PROFILE", "full", PIPELINE_PROFILES);
 
 export const config = {
   port: optionalInt("PORT", 3001),

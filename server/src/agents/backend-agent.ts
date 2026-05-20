@@ -61,18 +61,22 @@ STRICT FILE OUTPUT CONTRACT:
 - Do not use absolute paths or parent directory paths.`;
 
 export class BackendAgent extends BaseAgent {
-  constructor() {
+  private readonly runtimeProfile: typeof config.pipeline.profile;
+
+  constructor(profile: typeof config.pipeline.profile = config.pipeline.profile) {
     super({
       agentId: "backend",
       agentName: "Backend Agent",
       systemPrompt: SYSTEM_PROMPT,
       maxTokens: 16000,
       thinkingBudget: 8000,
+      profile,
     });
+    this.runtimeProfile = profile;
   }
 
   buildPrompt(projectIdea: string, architecture: string, prd: string): string {
-    if (config.pipeline.profile === "smoke") {
+    if (this.runtimeProfile === "smoke") {
       return `Product Idea: "${projectIdea}"
 
 SMOKE MODE: Implement a tiny runnable backend only. Keep it simple and complete.
@@ -97,7 +101,7 @@ Requirements:
 - Follow the strict file output contract: each heading immediately followed by one code block.`;
     }
 
-    if (config.pipeline.profile === "mvp") {
+    if (this.runtimeProfile === "mvp") {
       return `Product Idea: "${projectIdea}"
 
 ## Technical Architecture:
