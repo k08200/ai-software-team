@@ -10,6 +10,7 @@
     "smoke:ollama:verify": "VERIFY_GENERATED_PROJECTS=true node dist/scripts/ollama-smoke.js",
     "mvp:ollama": "PIPELINE_PROFILE=mvp MVP_MAX_TOKENS=6000 node dist/scripts/ollama-smoke.js",
     "mvp:ollama:verify": "PIPELINE_PROFILE=mvp MVP_MAX_TOKENS=6000 VERIFY_GENERATED_PROJECTS=true node dist/scripts/ollama-smoke.js",
+    "mvp:benchmark": "node dist/scripts/mvp-benchmark.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

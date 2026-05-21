@@ -127,6 +127,14 @@ npm run mvp:ollama:verify -- "동네 카페 예약 관리 MVP 만들어줘"
 
 검증은 생성 프로젝트를 임시 디렉터리로 복사한 뒤 실행하므로, ZIP 산출물에 `node_modules`나 `dist`가 섞이지 않습니다. Smoke/MVP 모드에서는 로컬 모델의 흔한 패키징 실수를 줄이기 위해 backend/frontend package manifest와 누락 CSS 참조를 최소 보정합니다.
 
+여러 아이디어에서 MVP 성공률을 추적하려면 벤치마크 러너를 사용합니다. 기본 세트는 10개 아이디어이며, 처음에는 긴 실행을 피하려고 `--limit`로 작게 돌리는 것을 권장합니다. 결과는 `server/outputs/benchmark-reports/` 아래에 JSON과 Markdown 리포트로 저장되고, 설치/빌드 실패는 유형별로 자동 분류됩니다.
+
+```bash
+npm run mvp:benchmark -- --list
+npm run mvp:benchmark -- --limit 3
+npm run mvp:benchmark -- --scenario cafe-reservations
+```
+
 전체 검증까지 돌릴 준비가 됐을 때는 `PIPELINE_PROFILE=full`과 기본 라운드 설정을 사용합니다.
 
 ## 사용 방법

@@ -55,7 +55,25 @@ console.log("after readme");
     const readme = await fs.readFile(path.join(outputDir, "generated/backend/README.md"), "utf-8");
     const source = await fs.readFile(path.join(outputDir, "generated/backend/src/index.ts"), "utf-8");
 
+    expect(readme).toContain("```bash");
     expect(readme).toContain("npm install");
     expect(source).toContain("after readme");
+  });
+
+  it("stops a fenced file section at the next file heading even when that heading is unfenced", async () => {
+    const fileManager = new FileManager(sessionId);
+    const markdown = `### vite.config.ts
+\`\`\`ts
+export default {};
+\`\`\`
+### README.md
+- Run npm install
+`;
+
+    await fileManager.saveMarkdownCodeBlocksAsFiles(markdown, "generated/frontend", "FRONTEND_RESPONSE.md");
+
+    await expect(
+      fs.readFile(path.join(outputDir, "generated/frontend/vite.config.ts"), "utf-8"),
+    ).resolves.toBe("export default {};");
   });
 });

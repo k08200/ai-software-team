@@ -151,7 +151,12 @@ export class FileManager {
   }
 
   private extractHeadingFileSections(markdown: string): Array<{ filename: string; content: string }> {
-    const headings: Array<{ filename: string; start: number; contentStart: number }> = [];
+    const headings: Array<{
+      filename: string;
+      start: number;
+      contentStart: number;
+      hasFence: boolean;
+    }> = [];
     let match: RegExpExecArray | null;
 
     FILE_SECTION_HEADING_RE.lastIndex = 0;
@@ -161,18 +166,19 @@ export class FileManager {
 
       const afterHeading = match.index + match[0].length;
       const fenceMatch = markdown.slice(afterHeading).match(/^\s*```[^\n]*\n/);
-      if (!fenceMatch) continue;
 
       headings.push({
         filename,
         start: match.index,
-        contentStart: afterHeading + fenceMatch[0].length,
+        contentStart: fenceMatch ? afterHeading + fenceMatch[0].length : afterHeading,
+        hasFence: !!fenceMatch,
       });
     }
 
     return headings
+      .filter((heading) => heading.hasFence)
       .map((heading, index) => {
-        const nextHeading = headings[index + 1];
+        const nextHeading = headings.find((candidate) => candidate.start > heading.start);
         const rawContent = markdown.slice(
           heading.contentStart,
           nextHeading ? nextHeading.start : markdown.length,
@@ -187,7 +193,7 @@ export class FileManager {
 
   private stripClosingFence(content: string): string {
     return content
-      .replace(/\n?```\s*$/m, "")
+      .replace(/\n?```\s*$/, "")
       .replace(/\n$/, "");
   }
 

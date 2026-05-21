@@ -15,6 +15,7 @@
     "smoke:ollama:verify": "npm run build --workspace=server && npm run smoke:ollama:verify --workspace=server",
     "mvp:ollama": "npm run build --workspace=server && npm run mvp:ollama --workspace=server",
     "mvp:ollama:verify": "npm run build --workspace=server && npm run mvp:ollama:verify --workspace=server",
+    "mvp:benchmark": "npm run build --workspace=server && npm run mvp:benchmark --workspace=server --",
     "install:all": "npm install"
   },
   "devDependencies": {
