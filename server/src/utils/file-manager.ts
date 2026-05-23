@@ -102,6 +102,7 @@ export class FileManager {
 
   private getExtension(agentId: string): string {
     const map: Record<string, string> = {
+      planner: "md",
       cto: "md",
       pm: "md",
       backend: "md",
@@ -192,9 +193,11 @@ export class FileManager {
   }
 
   private stripClosingFence(content: string): string {
-    return content
-      .replace(/\n?```\s*$/, "")
-      .replace(/\n$/, "");
+    let nextContent = content.replace(/\n$/, "");
+    while (/\n?```\s*$/.test(nextContent)) {
+      nextContent = nextContent.replace(/\n?```\s*$/, "").replace(/\n$/, "");
+    }
+    return nextContent;
   }
 
   private extractFilenameFromHeading(heading: string): string | null {

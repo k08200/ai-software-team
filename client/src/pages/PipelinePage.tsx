@@ -13,7 +13,7 @@ import type { AgentId } from "../types/index.js";
 import { PROFILE_DETAILS } from "../utils/pipeline-profile.js";
 
 const ALL_AGENTS: AgentId[] = [
-  "cto", "pm", "backend", "frontend", "qa", "security", "review",
+  "planner", "cto", "pm", "backend", "frontend", "qa", "security", "review",
 ];
 
 function Breadcrumb() {

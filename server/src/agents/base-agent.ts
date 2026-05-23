@@ -17,6 +17,7 @@ const LLM_PROVIDER = appConfig.llm.provider;
 
 // Fake token counts for demo — realistic-looking numbers
 const DEMO_TOKEN_MAP: Record<string, [number, number]> = {
+  planner:             [900,   1800],
   cto:                 [1200,  3200],
   pm:                  [1800,  4100],
   backend:             [2400,  8200],
@@ -268,7 +269,7 @@ export abstract class BaseAgent {
 }
 
 function isCompactProfile(profile: PipelineProfile): boolean {
-  return profile === "smoke" || profile === "mvp";
+  return profile === "smoke" || profile === "mvp" || profile === "fast-mvp";
 }
 
 function getProfileMaxTokens(profile: PipelineProfile, agentMaxTokens: number): number {
@@ -278,10 +279,21 @@ function getProfileMaxTokens(profile: PipelineProfile, agentMaxTokens: number): 
   if (profile === "mvp") {
     return Math.min(agentMaxTokens, appConfig.pipeline.mvpMaxTokens);
   }
+  if (profile === "fast-mvp") {
+    return Math.min(agentMaxTokens, appConfig.pipeline.fastMvpMaxTokens);
+  }
   return agentMaxTokens;
 }
 
 function getProfileInstruction(profile: PipelineProfile): string {
+  if (profile === "fast-mvp") {
+    return [
+      "FAST MVP MODE: Optimize for local open-source model speed and reliable runnable output.",
+      "Keep responses short, file-oriented, and focused on one complete vertical slice.",
+      "Avoid optional infrastructure, extra packages, broad documentation, and any feature not needed for the first usable screen.",
+    ].join(" ");
+  }
+
   if (profile === "mvp") {
     return [
       "MVP MODE: Keep the response compact, implementation-first, and focused on one polished vertical slice.",
@@ -303,6 +315,7 @@ function estimateTokenCount(text: string): number {
 
 export function getAgentColor(agentId: AgentId): string {
   const colors: Record<AgentId, string> = {
+    planner: "#14b8a6",
     cto: "#6366f1",
     pm: "#8b5cf6",
     backend: "#06b6d4",

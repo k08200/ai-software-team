@@ -1,3 +1,5 @@
+import type { PipelineProfile } from "../config.js";
+
 /**
  * Cost estimation for Claude API usage.
  * Prices as of 2025 (USD per million tokens).
@@ -37,6 +39,7 @@ const PRICING: Record<string, ModelPricing> = {
 
 // Estimated token counts per agent (based on empirical runs)
 const AGENT_TOKEN_ESTIMATES: Record<string, { input: number; output: number }> = {
+  planner:  { input: 1500,  output: 3000 },
   cto:      { input: 2000,  output: 6000 },
   pm:       { input: 8000,  output: 8000 },
   backend:  { input: 12000, output: 14000 },
@@ -62,9 +65,10 @@ export function estimateCost(
   model: string = "claude-opus-4-6",
   rounds: number = 3,
   provider: string = "anthropic",
+  profile: PipelineProfile = "full",
 ): CostEstimate {
   if (provider === "ollama") {
-    const totalTokens = estimateTotalTokens(rounds);
+    const totalTokens = estimateTotalTokens(rounds, profile);
     return {
       provider,
       model,
@@ -74,7 +78,7 @@ export function estimateCost(
       maxCostUSD: 0,
       perRoundCostUSD: 0,
       roundCount: rounds,
-      breakdown: buildZeroCostBreakdown(),
+      breakdown: buildZeroCostBreakdown(profile),
     };
   }
 
@@ -84,7 +88,7 @@ export function estimateCost(
   let baseTokens = 0;
 
   // Phase 1 agents (run once)
-  for (const agent of ["cto", "pm", "backend", "frontend"]) {
+  for (const agent of getBaseAgents(profile)) {
     const est = AGENT_TOKEN_ESTIMATES[agent];
     const cost =
       (est.input / 1_000_000) * pricing.inputPerMillion +
@@ -122,8 +126,8 @@ export function estimateCost(
   };
 }
 
-function estimateTotalTokens(rounds: number): number {
-  const baseTokens = ["cto", "pm", "backend", "frontend"].reduce((sum, agent) => {
+function estimateTotalTokens(rounds: number, profile: PipelineProfile): number {
+  const baseTokens = getBaseAgents(profile).reduce((sum, agent) => {
     const est = AGENT_TOKEN_ESTIMATES[agent];
     return sum + est.input + est.output;
   }, 0);
@@ -134,13 +138,28 @@ function estimateTotalTokens(rounds: number): number {
   return baseTokens + roundTokens * rounds;
 }
 
-function buildZeroCostBreakdown(): Record<string, { tokens: number; costUSD: number }> {
+function buildZeroCostBreakdown(profile: PipelineProfile): Record<string, { tokens: number; costUSD: number }> {
+  const agents = [
+    ...getBaseAgents(profile),
+    ...(profile === "full" ? ["qa", "security", "review"] : []),
+  ];
+
   return Object.fromEntries(
-    Object.entries(AGENT_TOKEN_ESTIMATES).map(([agent, est]) => [
-      agent,
-      { tokens: est.input + est.output, costUSD: 0 },
-    ]),
+    agents.map((agent) => {
+      const est = AGENT_TOKEN_ESTIMATES[agent];
+      return [
+        agent,
+        { tokens: est.input + est.output, costUSD: 0 },
+      ];
+    }),
   );
+}
+
+function getBaseAgents(profile: PipelineProfile): string[] {
+  if (profile === "fast-mvp") {
+    return ["planner", "backend", "frontend"];
+  }
+  return ["cto", "pm", "backend", "frontend"];
 }
 
 export function formatCost(usd: number): string {

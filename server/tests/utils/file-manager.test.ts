@@ -76,4 +76,21 @@ export default {};
       fs.readFile(path.join(outputDir, "generated/frontend/vite.config.ts"), "utf-8"),
     ).resolves.toBe("export default {};");
   });
+
+  it("removes repeated trailing markdown fences from a generated source file", async () => {
+    const fileManager = new FileManager(sessionId);
+    const markdown = `### src/main.tsx
+\`\`\`tsx
+console.log("ok");
+\`\`\`
+
+\`\`\`
+`;
+
+    await fileManager.saveMarkdownCodeBlocksAsFiles(markdown, "generated/frontend", "FRONTEND_RESPONSE.md");
+
+    await expect(
+      fs.readFile(path.join(outputDir, "generated/frontend/src/main.tsx"), "utf-8"),
+    ).resolves.toBe('console.log("ok");');
+  });
 });

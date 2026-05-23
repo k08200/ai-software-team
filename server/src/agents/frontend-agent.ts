@@ -104,6 +104,41 @@ Requirements:
 - Follow the strict file output contract: each heading immediately followed by one code block.`;
     }
 
+    if (this.runtimeProfile === "fast-mvp") {
+      return `Product Idea: "${projectIdea}"
+
+## Fast MVP Blueprint:
+${prd}
+
+## Backend Implementation (for API reference):
+${backendCode.substring(0, 4500)}...
+
+FAST MVP MODE: Implement a polished, idea-specific React frontend for the blueprint.
+
+Return exactly these files, and no other text:
+### package.json
+### index.html
+### vite.config.ts
+### src/main.tsx
+
+Requirements:
+- Use React 18 + TypeScript + Vite only.
+- Keep all UI code in src/main.tsx for reliability.
+- Do not use Tailwind, Zustand, React Query, React Router, Axios, Zod, or any package not listed below.
+- package.json must include scripts: "dev": "vite", "build": "vite build", "preview": "vite preview".
+- package.json dependencies must include exactly "react": "^18.2.0", "react-dom": "^18.2.0".
+- package.json devDependencies must include exactly "typescript": "^5.4.5", "vite": "^5.4.0", "@vitejs/plugin-react": "^4.3.1", "@types/react": "^18.2.66", "@types/react-dom": "^18.2.22".
+- Use CSS inside src/main.tsx via a <style> tag or injected style element; do not reference external CSS files.
+- Use createRoot from "react-dom/client".
+- The first screen must be the usable product, not a marketing landing page.
+- Make the UI domain-specific with realistic seed data, empty states, loading/error states, and at least one create/update/delete interaction.
+- Try to call the backend API endpoints with fetch, but gracefully fall back to local in-memory demo data when the API is unavailable so static preview still works.
+- Do not reference undeclared variables in fallback create/update/delete handlers.
+- Use accessible labels, keyboard-friendly buttons/forms, responsive layout, and professional visual polish.
+- Avoid one-color purple/blue gradient themes; use a restrained multi-color palette that fits the product domain.
+- Follow the strict file output contract: each heading immediately followed by one code block.`;
+    }
+
     if (this.runtimeProfile === "mvp") {
       return `Product Idea: "${projectIdea}"
 

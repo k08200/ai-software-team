@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import type { PipelineProfile } from "../config.js";
 import type { ProjectVerification } from "../utils/project-verifier.js";
 import {
   classifyVerificationFailures,
@@ -13,11 +14,14 @@ import type { SSEEvent } from "../types.js";
 process.env.LLM_PROVIDER ??= "ollama";
 process.env.OLLAMA_BASE_URL ??= "http://127.0.0.1:11434";
 process.env.OLLAMA_MODEL ??= "qwen2.5-coder:14b";
-process.env.PIPELINE_PROFILE = "mvp";
+process.env.PIPELINE_PROFILE ??= "fast-mvp";
+process.env.FAST_MVP_MAX_TOKENS ??= "4200";
 process.env.MVP_MAX_TOKENS ??= "6000";
 process.env.VERIFY_GENERATED_PROJECTS ??= "true";
 process.env.DEMO_MODE ??= "false";
 process.env.JWT_SECRET ??= "local-benchmark";
+
+type BenchmarkProfile = Extract<PipelineProfile, "fast-mvp" | "mvp">;
 
 interface BenchmarkScenario {
   id: string;
@@ -48,7 +52,7 @@ interface BenchmarkScenarioResult {
 }
 
 interface BenchmarkReport {
-  profile: "mvp";
+  profile: BenchmarkProfile;
   provider: string;
   model: string;
   startedAt: string;
@@ -66,6 +70,7 @@ interface BenchmarkReport {
 interface CliOptions {
   limit?: number;
   scenario?: string;
+  profile: BenchmarkProfile;
   list: boolean;
 }
 
@@ -84,6 +89,7 @@ const SCENARIOS: BenchmarkScenario[] = [
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  process.env.PIPELINE_PROFILE = options.profile;
   const selectedScenarios = selectScenarios(options);
 
   if (options.list) {
@@ -101,16 +107,17 @@ async function main(): Promise<void> {
 
   console.log(`[mvp-benchmark] provider=${process.env.LLM_PROVIDER}`);
   console.log(`[mvp-benchmark] model=${process.env.OLLAMA_MODEL}`);
+  console.log(`[mvp-benchmark] profile=${options.profile}`);
   console.log(`[mvp-benchmark] scenarios=${selectedScenarios.length}`);
 
   for (const scenario of selectedScenarios) {
-    const orchestrator = new PipelineOrchestrator({ profile: "mvp" });
+    const orchestrator = new PipelineOrchestrator({ profile: options.profile });
     const result = await runScenario(orchestrator, scenario);
     results.push(result);
     printScenarioResult(result);
   }
 
-  const report = createReport(startedAt, results);
+  const report = createReport(startedAt, options.profile, results);
   const reportPaths = await writeReport(report);
   console.log(`[mvp-benchmark] json=${reportPaths.json}`);
   console.log(`[mvp-benchmark] markdown=${reportPaths.markdown}`);
@@ -183,11 +190,15 @@ async function runScenario(
   return result;
 }
 
-function createReport(startedAt: Date, scenarios: BenchmarkScenarioResult[]): BenchmarkReport {
+function createReport(
+  startedAt: Date,
+  profile: BenchmarkProfile,
+  scenarios: BenchmarkScenarioResult[],
+): BenchmarkReport {
   const failures = scenarios.flatMap((scenario) => scenario.failures);
 
   return {
-    profile: "mvp",
+    profile,
     provider: process.env.LLM_PROVIDER ?? "unknown",
     model: process.env.OLLAMA_MODEL ?? "unknown",
     startedAt: startedAt.toISOString(),
@@ -206,8 +217,8 @@ function createReport(startedAt: Date, scenarios: BenchmarkScenarioResult[]): Be
 async function writeReport(report: BenchmarkReport): Promise<{ json: string; markdown: string }> {
   const reportDir = path.join(process.cwd(), "outputs", "benchmark-reports");
   const stamp = report.startedAt.replace(/[:.]/g, "-");
-  const jsonPath = path.join(reportDir, `mvp-benchmark-${stamp}.json`);
-  const markdownPath = path.join(reportDir, `mvp-benchmark-${stamp}.md`);
+  const jsonPath = path.join(reportDir, `${report.profile}-benchmark-${stamp}.json`);
+  const markdownPath = path.join(reportDir, `${report.profile}-benchmark-${stamp}.md`);
 
   await fs.mkdir(reportDir, { recursive: true });
   await Promise.all([
@@ -224,6 +235,7 @@ function formatMarkdownReport(report: BenchmarkReport): string {
     "",
     `- Provider: ${report.provider}`,
     `- Model: ${report.model}`,
+    `- Profile: ${report.profile}`,
     `- Started: ${report.startedAt}`,
     `- Duration: ${formatDuration(report.durationMs)}`,
     `- Pass rate: ${report.summary.passed}/${report.summary.total}`,
@@ -277,7 +289,10 @@ function formatMarkdownReport(report: BenchmarkReport): string {
 }
 
 function parseArgs(args: string[]): CliOptions {
-  const options: CliOptions = { list: false };
+  const options: CliOptions = {
+    profile: parseBenchmarkProfile(process.env.PIPELINE_PROFILE) ?? "fast-mvp",
+    list: false,
+  };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -291,12 +306,28 @@ function parseArgs(args: string[]): CliOptions {
       options.scenario = args[++i];
     } else if (arg.startsWith("--scenario=")) {
       options.scenario = arg.slice("--scenario=".length);
+    } else if (arg === "--profile") {
+      options.profile = parseRequiredBenchmarkProfile(args[++i]);
+    } else if (arg.startsWith("--profile=")) {
+      options.profile = parseRequiredBenchmarkProfile(arg.slice("--profile=".length));
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
 
   return options;
+}
+
+function parseRequiredBenchmarkProfile(value: string | undefined): BenchmarkProfile {
+  const profile = parseBenchmarkProfile(value);
+  if (!profile) {
+    throw new Error("--profile must be one of: fast-mvp, mvp.");
+  }
+  return profile;
+}
+
+function parseBenchmarkProfile(value: unknown): BenchmarkProfile | null {
+  return value === "fast-mvp" || value === "mvp" ? value : null;
 }
 
 function selectScenarios(options: CliOptions): BenchmarkScenario[] {

@@ -5,6 +5,7 @@ import type {
 } from "../types.js";
 import { CTOAgent } from "../agents/cto-agent.js";
 import { PMAgent } from "../agents/pm-agent.js";
+import { FastMvpPlannerAgent } from "../agents/fast-mvp-planner-agent.js";
 import { BackendAgent } from "../agents/backend-agent.js";
 import { FrontendAgent } from "../agents/frontend-agent.js";
 import { QAAgent } from "../agents/qa-agent.js";
@@ -35,6 +36,7 @@ interface PipelineOrchestratorOptions {
 
 export class PipelineOrchestrator {
   private readonly profile: PipelineProfile;
+  private readonly fastMvpPlannerAgent: FastMvpPlannerAgent;
   private readonly ctoAgent: CTOAgent;
   private readonly pmAgent: PMAgent;
   private readonly backendAgent: BackendAgent;
@@ -48,6 +50,7 @@ export class PipelineOrchestrator {
 
   constructor(options: PipelineOrchestratorOptions = {}) {
     this.profile = options.profile ?? config.pipeline.profile;
+    this.fastMvpPlannerAgent = new FastMvpPlannerAgent(this.profile);
     this.ctoAgent = new CTOAgent(this.profile);
     this.pmAgent = new PMAgent(this.profile);
     this.backendAgent = new BackendAgent(this.profile);
@@ -100,21 +103,32 @@ export class PipelineOrchestrator {
     });
 
     try {
-      // ─── Phase 1: CTO ────────────────────────────────────────────
-      ctx.architecture = await this.runAgent(
-        "cto", "CTO Agent",
-        this.ctoAgent.buildPrompt(projectIdea),
-        emit,
-        (o) => fileManager.saveAgentOutput(o),
-      );
+      if (this.profile === "fast-mvp") {
+        const blueprint = await this.runAgent(
+          "planner", "Fast MVP Planner",
+          this.fastMvpPlannerAgent.buildPrompt(projectIdea),
+          emit,
+          (o) => fileManager.saveAgentOutput(o),
+        );
+        ctx.architecture = blueprint;
+        ctx.prd = blueprint;
+      } else {
+        // ─── Phase 1: CTO ────────────────────────────────────────────
+        ctx.architecture = await this.runAgent(
+          "cto", "CTO Agent",
+          this.ctoAgent.buildPrompt(projectIdea),
+          emit,
+          (o) => fileManager.saveAgentOutput(o),
+        );
 
-      // ─── Phase 2: PM ─────────────────────────────────────────────
-      ctx.prd = await this.runAgent(
-        "pm", "PM Agent",
-        this.pmAgent.buildPrompt(projectIdea, ctx.architecture),
-        emit,
-        (o) => fileManager.saveAgentOutput(o),
-      );
+        // ─── Phase 2: PM ─────────────────────────────────────────────
+        ctx.prd = await this.runAgent(
+          "pm", "PM Agent",
+          this.pmAgent.buildPrompt(projectIdea, ctx.architecture),
+          emit,
+          (o) => fileManager.saveAgentOutput(o),
+        );
+      }
 
       // ─── Phase 3: Backend ─────────────────────────────────────────
       ctx.backendCode = await this.runAgent(
@@ -314,6 +328,7 @@ export class PipelineOrchestrator {
     const agents: Record<string, { run: (p: string, cb: StreamCallback) => Promise<AgentOutput> }> = {
       cto:      this.ctoAgent,
       pm:       this.pmAgent,
+      planner:  this.fastMvpPlannerAgent,
       backend:  this.backendAgent,
       frontend: this.frontendAgent,
       qa:       this.qaAgent,
@@ -521,6 +536,6 @@ ${((Date.now() - ctx.startTime) / 1000).toFixed(1)}s
   }
 
   private skipsReviewRounds(): boolean {
-    return this.profile === "smoke" || this.profile === "mvp";
+    return this.profile === "smoke" || this.profile === "mvp" || this.profile === "fast-mvp";
   }
 }

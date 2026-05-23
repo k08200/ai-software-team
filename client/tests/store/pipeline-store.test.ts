@@ -9,7 +9,7 @@ describe("usePipelineStore", () => {
   it("initializes in idle state", () => {
     const { status, profile, totalTokens, rounds } = usePipelineStore.getState();
     expect(status).toBe("idle");
-    expect(profile).toBe("mvp");
+    expect(profile).toBe("fast-mvp");
     expect(totalTokens).toBe(0);
     expect(rounds).toHaveLength(0);
   });
@@ -17,6 +17,15 @@ describe("usePipelineStore", () => {
   it("sets the selected pipeline profile", () => {
     usePipelineStore.getState().setProfile("smoke");
     expect(usePipelineStore.getState().profile).toBe("smoke");
+  });
+
+  it("handles fast MVP planner events", () => {
+    usePipelineStore.getState().handleSSEEvent("agent_start", { agentId: "planner", agentName: "Fast MVP Planner" });
+    usePipelineStore.getState().handleSSEEvent("agent_output", { agentId: "planner", content: "Blueprint" });
+
+    const { agents } = usePipelineStore.getState();
+    expect(agents.planner.status).toBe("running");
+    expect(agents.planner.output).toBe("Blueprint");
   });
 
   it("transitions to running on startPipeline", () => {

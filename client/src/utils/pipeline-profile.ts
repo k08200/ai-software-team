@@ -8,6 +8,14 @@ export const PROFILE_DETAILS: Record<PipelineProfile, {
   skippedRoundsSummary: string;
   agentOrder: AgentId[];
 }> = {
+  "fast-mvp": {
+    label: "Fast MVP",
+    description: "가장 빠른 로컬 앱 생성",
+    completionTitle: "Fast MVP 생성 완료",
+    completionSummary: "압축된 로컬 생성 흐름으로 앱 미리보기와 ZIP을 빠르게 확인할 수 있습니다.",
+    skippedRoundsSummary: "Fast MVP 프로필은 planner, backend, frontend만 실행하고 빌드 검증을 우선합니다.",
+    agentOrder: ["planner", "backend", "frontend"],
+  },
   mvp: {
     label: "MVP",
     description: "아이디어 맞춤 앱, 로컬 추천",
@@ -33,4 +41,3 @@ export const PROFILE_DETAILS: Record<PipelineProfile, {
     agentOrder: ["cto", "pm", "backend", "frontend", "qa", "security", "review"],
   },
 };
-

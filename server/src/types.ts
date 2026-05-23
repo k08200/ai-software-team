@@ -1,4 +1,5 @@
 export type AgentId =
+  | "planner"
   | "cto"
   | "pm"
   | "backend"

@@ -11,6 +11,7 @@ import type {
 } from "../types/index.js";
 
 const AGENTS: Record<AgentId, Pick<AgentState, "id" | "name" | "emoji" | "color">> = {
+  planner: { id: "planner", name: "Fast MVP Planner", emoji: "⚡", color: "#14b8a6" },
   cto: { id: "cto", name: "CTO Agent", emoji: "🏗️", color: "#6366f1" },
   pm: { id: "pm", name: "PM Agent", emoji: "📋", color: "#8b5cf6" },
   backend: { id: "backend", name: "Backend Agent", emoji: "⚙️", color: "#06b6d4" },
@@ -51,7 +52,7 @@ interface PipelineActions {
 
 const initialState: PipelineState = {
   status: "idle",
-  profile: "mvp",
+  profile: "fast-mvp",
   projectIdea: "",
   sessionId: null,
   currentAgent: null,
@@ -286,5 +287,7 @@ function parseStatus(value: unknown): VerificationStatus {
 }
 
 function parseProfile(value: unknown, fallback: PipelineProfile): PipelineProfile {
-  return value === "smoke" || value === "mvp" || value === "full" ? value : fallback;
+  return value === "smoke" || value === "mvp" || value === "fast-mvp" || value === "full"
+    ? value
+    : fallback;
 }

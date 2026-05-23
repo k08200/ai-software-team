@@ -1,4 +1,5 @@
 export type AgentId =
+  | "planner"
   | "cto"
   | "pm"
   | "backend"
@@ -20,7 +21,7 @@ export type PipelineStatus =
   | "completed"
   | "error";
 
-export type PipelineProfile = "smoke" | "mvp" | "full";
+export type PipelineProfile = "smoke" | "mvp" | "fast-mvp" | "full";
 
 export interface AgentState {
   id: AgentId;

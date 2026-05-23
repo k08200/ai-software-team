@@ -18,6 +18,11 @@ const PROFILE_OPTIONS: Array<{
   description: string;
 }> = [
   {
+    id: "fast-mvp",
+    label: PROFILE_DETAILS["fast-mvp"].label,
+    description: PROFILE_DETAILS["fast-mvp"].description,
+  },
+  {
     id: "mvp",
     label: PROFILE_DETAILS.mvp.label,
     description: PROFILE_DETAILS.mvp.description,
@@ -99,7 +104,7 @@ export function IdeaInput() {
         )}
 
         {!isRunning && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-label="Pipeline profile">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2" role="radiogroup" aria-label="Pipeline profile">
             {PROFILE_OPTIONS.map((option) => {
               const selected = profile === option.id;
               return (

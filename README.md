@@ -119,7 +119,13 @@ npm run smoke:ollama -- "간단한 메모 앱 만들어줘"
 npm run smoke:ollama:verify -- "간단한 메모 앱 만들어줘"
 ```
 
-아이디어에 맞춘 작은 풀스택 MVP를 만들고 싶으면 mvp 프로필을 사용합니다. 이 모드는 무료 로컬 모델이 감당하기 쉽도록 의존성을 줄이고, 반복 리뷰 라운드는 건너뛰며, 생성 앱 미리보기를 위해 프론트엔드가 API 실패 시 로컬 데모 데이터로 동작하도록 지시합니다.
+아이디어에 맞춘 작은 풀스택 MVP를 가장 빠르게 만들고 싶으면 fast-mvp 프로필을 사용합니다. 이 모드는 CTO와 PM 단계를 하나의 planner 단계로 압축하고, Backend/Frontend만 이어서 실행해 무료 로컬 모델에서 기다리는 시간을 줄입니다.
+
+```bash
+npm run fast-mvp:ollama:verify -- "동네 카페 예약 관리 MVP 만들어줘"
+```
+
+더 자세한 기획 문서를 거친 MVP를 만들고 싶으면 mvp 프로필을 사용합니다. 이 모드는 무료 로컬 모델이 감당하기 쉽도록 의존성을 줄이고, 반복 리뷰 라운드는 건너뛰며, 생성 앱 미리보기를 위해 프론트엔드가 API 실패 시 로컬 데모 데이터로 동작하도록 지시합니다.
 
 ```bash
 npm run mvp:ollama:verify -- "동네 카페 예약 관리 MVP 만들어줘"
@@ -127,11 +133,12 @@ npm run mvp:ollama:verify -- "동네 카페 예약 관리 MVP 만들어줘"
 
 검증은 생성 프로젝트를 임시 디렉터리로 복사한 뒤 실행하므로, ZIP 산출물에 `node_modules`나 `dist`가 섞이지 않습니다. Smoke/MVP 모드에서는 로컬 모델의 흔한 패키징 실수를 줄이기 위해 backend/frontend package manifest와 누락 CSS 참조를 최소 보정합니다.
 
-여러 아이디어에서 MVP 성공률을 추적하려면 벤치마크 러너를 사용합니다. 기본 세트는 10개 아이디어이며, 처음에는 긴 실행을 피하려고 `--limit`로 작게 돌리는 것을 권장합니다. 결과는 `server/outputs/benchmark-reports/` 아래에 JSON과 Markdown 리포트로 저장되고, 설치/빌드 실패는 유형별로 자동 분류됩니다.
+여러 아이디어에서 MVP 성공률을 추적하려면 벤치마크 러너를 사용합니다. 기본 세트는 10개 아이디어이며, 처음에는 긴 실행을 피하려고 `--limit`로 작게 돌리는 것을 권장합니다. 결과는 `server/outputs/benchmark-reports/` 아래에 JSON과 Markdown 리포트로 저장되고, 설치/빌드 실패는 유형별로 자동 분류됩니다. 기본 벤치마크 프로필은 `fast-mvp`이며, 기존 `mvp`와 비교하려면 `--profile mvp`를 지정합니다.
 
 ```bash
 npm run mvp:benchmark -- --list
 npm run mvp:benchmark -- --limit 3
+npm run mvp:benchmark -- --profile mvp --scenario cafe-reservations
 npm run mvp:benchmark -- --scenario cafe-reservations
 ```
 
@@ -165,10 +172,11 @@ npm run mvp:benchmark -- --scenario cafe-reservations
 | `ANTHROPIC_API_KEY` | 선택 | `LLM_PROVIDER=anthropic`일 때 필요한 Anthropic API 키 |
 | `ANTHROPIC_MODEL` | `claude-opus-4-6` | Anthropic provider에서 사용할 Claude 모델 |
 | `THINKING_BUDGET` | `8000` | Extended thinking 토큰 예산 |
-| `PIPELINE_PROFILE` | `full` | 실행 프로필 (`full`, `mvp`, `smoke`) |
+| `PIPELINE_PROFILE` | `full` | 실행 프로필 (`full`, `fast-mvp`, `mvp`, `smoke`) |
 | `MAX_ROUNDS` | `3` | 최대 반복 라운드 수 |
 | `MIN_ROUNDS` | `3` | 최소 반복 라운드 수 |
 | `SMOKE_MAX_TOKENS` | `768` | `PIPELINE_PROFILE=smoke`에서 에이전트별 최대 생성 토큰 |
+| `FAST_MVP_MAX_TOKENS` | `4200` | `PIPELINE_PROFILE=fast-mvp`에서 에이전트별 최대 생성 토큰 |
 | `MVP_MAX_TOKENS` | `6000` | `PIPELINE_PROFILE=mvp`에서 에이전트별 최대 생성 토큰 |
 | `PORT` | `3001` | 서버 포트 |
 | `VERIFY_GENERATED_PROJECTS` | `false` | 생성된 프로젝트에서 `npm install`, `npm run build`, `npm test`를 실행할지 여부 |

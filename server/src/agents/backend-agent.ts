@@ -101,6 +101,35 @@ Requirements:
 - Follow the strict file output contract: each heading immediately followed by one code block.`;
     }
 
+    if (this.runtimeProfile === "fast-mvp") {
+      return `Product Idea: "${projectIdea}"
+
+## Fast MVP Blueprint:
+${prd}
+
+FAST MVP MODE: Implement a small idea-specific Express + TypeScript backend for the blueprint.
+
+Return exactly these files, and no other text:
+### package.json
+### tsconfig.json
+### src/index.ts
+
+Requirements:
+- Use Express + TypeScript only.
+- Use in-memory storage with realistic seed data derived from the product idea.
+- Implement GET /health plus 3-4 REST endpoints under /api that match the blueprint.
+- Include JSON responses, CORS support, and small local request validation helpers.
+- package.json must include scripts: "build": "tsc", "start": "node dist/index.js", "dev": "tsx src/index.ts".
+- package.json dependencies must include exactly "express": "^4.19.2", "cors": "^2.8.5".
+- package.json devDependencies must include exactly "typescript": "^5.4.5", "tsx": "^4.15.6", "@types/express": "^4.17.21", "@types/cors": "^2.8.17", "@types/node": "^20.14.0".
+- tsconfig.json must set "rootDir": "src", "outDir": "dist", "module": "CommonJS", "target": "ES2022", "esModuleInterop": true, and "strict": true.
+- Keep all backend source in src/index.ts.
+- Do not import packages that are not listed in package.json.
+- Do not import uuid; use a simple local incrementing id like let nextId = 3.
+- No databases, auth, payments, queues, Docker, tests, or cloud services.
+- Follow the strict file output contract: each heading immediately followed by one code block.`;
+    }
+
     if (this.runtimeProfile === "mvp") {
       return `Product Idea: "${projectIdea}"
 

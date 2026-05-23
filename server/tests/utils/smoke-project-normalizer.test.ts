@@ -44,8 +44,8 @@ describe("normalizeSmokeGeneratedProjects", () => {
     expect(backendPackage.devDependencies.tsc).toBeUndefined();
     expect(backendPackage.dependencies.cors).toBe("^2.8.5");
     expect(backendPackage.devDependencies["@types/cors"]).toBe("^2.8.17");
-    expect(backendPackage.devDependencies["@types/uuid"]).toBe("^10.0.0");
-    expect(backendPackage.dependencies.uuid).toBe("^10.0.0");
+    expect(backendPackage.devDependencies["@types/uuid"]).toBeUndefined();
+    expect(backendPackage.dependencies.uuid).toBeUndefined();
     expect(backendPackage.devDependencies.typescript).toBe("^5.4.5");
     expect(frontendPackage.scripts.build).toBe("vite build");
     expect(frontendPackage.devDependencies.vite).toBe("^5.4.0");

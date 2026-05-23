@@ -72,6 +72,26 @@ describe("benchmark classifier", () => {
     });
   });
 
+  it("does not count build and test skips again when install already failed", () => {
+    const verification: ProjectVerification[] = [
+      {
+        name: "Backend",
+        relativePath: "generated/backend",
+        fileCount: 3,
+        hasPackageJson: true,
+        commands: [
+          { command: "npm install", status: "failed", durationMs: 120000, output: "" },
+          { command: "npm run build", status: "skipped", durationMs: 0, reason: "npm install failed" },
+          { command: "npm test", status: "skipped", durationMs: 0, reason: "npm install failed" },
+        ],
+      },
+    ];
+
+    expect(classifyVerificationFailures(verification).map((failure) => failure.category)).toEqual([
+      "install-failed",
+    ]);
+  });
+
   it("classifies missing source and import failures", () => {
     const verification: ProjectVerification[] = [
       {

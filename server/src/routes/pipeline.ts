@@ -35,7 +35,7 @@ router.post("/run", authRequired, async (req: Request, res: Response): Promise<v
     return;
   }
   if (!profile) {
-    res.status(400).json({ error: "Pipeline profile must be one of: full, mvp, smoke." });
+    res.status(400).json({ error: "Pipeline profile must be one of: full, fast-mvp, mvp, smoke." });
     return;
   }
 
@@ -211,7 +211,7 @@ router.get("/estimate", (req: Request, res: Response): void => {
     return;
   }
 
-  const estimate = estimateCost(model, rounds, provider);
+  const estimate = estimateCost(model, rounds, provider, profile);
   res.json(estimate);
 });
 

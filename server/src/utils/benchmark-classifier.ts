@@ -38,7 +38,18 @@ export function classifyVerificationFailures(
       continue;
     }
 
+    const installFailed = project.commands.some((command) => (
+      command.command === "npm install" && command.status === "failed"
+    ));
+
     for (const command of project.commands) {
+      if (
+        installFailed &&
+        command.status === "skipped" &&
+        command.reason === "npm install failed"
+      ) {
+        continue;
+      }
       const failure = classifyCommandFailure(project.name, command);
       if (failure) failures.push(failure);
     }

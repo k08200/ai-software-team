@@ -82,7 +82,7 @@ export function PipelineStatus() {
           {profileDetails.label} · {profileDetails.agentOrder.length} agents
         </span>
       </div>
-      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${profile === "full" ? "lg:grid-cols-7" : "lg:grid-cols-4"}`}>
+      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${profile === "full" ? "lg:grid-cols-7" : profile === "fast-mvp" ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}>
         {profileDetails.agentOrder.map((agentId, i) => (
           <div key={agentId} className="flex items-center gap-1">
             <AgentPill agentId={agentId} />

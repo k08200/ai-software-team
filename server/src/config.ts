@@ -33,7 +33,7 @@ function optionalChoice<const T extends readonly string[]>(
   return val as T[number];
 }
 
-export const PIPELINE_PROFILES = ["full", "mvp", "smoke"] as const;
+export const PIPELINE_PROFILES = ["full", "fast-mvp", "mvp", "smoke"] as const;
 export type PipelineProfile = (typeof PIPELINE_PROFILES)[number];
 
 export function parsePipelineProfile(value: unknown): PipelineProfile | null {
@@ -78,6 +78,7 @@ export const config = {
     maxRounds: optionalInt("MAX_ROUNDS", 3),
     minRounds: optionalInt("MIN_ROUNDS", 3),
     smokeMaxTokens: optionalInt("SMOKE_MAX_TOKENS", 768),
+    fastMvpMaxTokens: optionalInt("FAST_MVP_MAX_TOKENS", 4200),
     mvpMaxTokens: optionalInt("MVP_MAX_TOKENS", 6000),
     maxConcurrent: optionalInt("MAX_CONCURRENT_PIPELINES", 3),
     outputTtlHours: optionalInt("OUTPUT_TTL_HOURS", 24),
