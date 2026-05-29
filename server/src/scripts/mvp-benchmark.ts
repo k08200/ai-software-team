@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import type { PipelineProfile } from "../config.js";
 import type { ProjectVerification } from "../utils/project-verifier.js";
 import {
+  classifyPipelineError,
   classifyVerificationFailures,
   summarizeFailureCategories,
   type BenchmarkFailure,
@@ -63,6 +64,9 @@ interface BenchmarkReport {
     total: number;
     passed: number;
     failed: number;
+    averageDurationMs: number;
+    averageTokens: number;
+    agentAverages: Record<string, number>;
     failureCategories: Record<BenchmarkFailureCategory, number>;
   };
 }
@@ -183,6 +187,8 @@ async function runScenario(
 
   result.durationMs = Date.now() - startedAtMs;
   result.failures = classifyVerificationFailures(result.verification);
+  const pipelineFailure = classifyPipelineError(result.error);
+  if (pipelineFailure) result.failures.push(pipelineFailure);
   result.status = result.verificationPassed && result.failures.length === 0 && !result.error
     ? "passed"
     : "failed";
@@ -209,6 +215,9 @@ function createReport(
       total: scenarios.length,
       passed: scenarios.filter((scenario) => scenario.status === "passed").length,
       failed: scenarios.filter((scenario) => scenario.status === "failed").length,
+      averageDurationMs: average(scenarios.map((scenario) => scenario.durationMs)),
+      averageTokens: Math.round(average(scenarios.map((scenario) => scenario.totalTokens))),
+      agentAverages: averageAgentDurations(scenarios),
       failureCategories: summarizeFailureCategories(failures),
     },
   };
@@ -239,6 +248,8 @@ function formatMarkdownReport(report: BenchmarkReport): string {
     `- Started: ${report.startedAt}`,
     `- Duration: ${formatDuration(report.durationMs)}`,
     `- Pass rate: ${report.summary.passed}/${report.summary.total}`,
+    `- Average scenario duration: ${formatDuration(report.summary.averageDurationMs)}`,
+    `- Average tokens: ${report.summary.averageTokens.toLocaleString()}`,
     "",
     "## Scenarios",
     "",
@@ -264,6 +275,16 @@ function formatMarkdownReport(report: BenchmarkReport): string {
   } else {
     for (const [category, count] of categories) {
       lines.push(`- ${category}: ${count}`);
+    }
+  }
+
+  lines.push("", "## Agent Timing", "");
+  const agentAverages = Object.entries(report.summary.agentAverages);
+  if (agentAverages.length === 0) {
+    lines.push("No agent timings recorded.");
+  } else {
+    for (const [agentName, durationMs] of agentAverages) {
+      lines.push(`- ${agentName}: ${formatDuration(durationMs)}`);
     }
   }
 
@@ -357,6 +378,26 @@ function printScenarioResult(result: BenchmarkScenarioResult): void {
   const status = result.status.toUpperCase();
   const failureSummary = result.failures.map((failure) => failure.category).join(", ") || "none";
   console.log(`[scenario:${status}] ${result.id} duration=${formatDuration(result.durationMs)} failures=${failureSummary}`);
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function averageAgentDurations(scenarios: BenchmarkScenarioResult[]): Record<string, number> {
+  const grouped = new Map<string, number[]>();
+  for (const scenario of scenarios) {
+    for (const agent of scenario.agents) {
+      const values = grouped.get(agent.agentName) ?? [];
+      values.push(agent.durationMs);
+      grouped.set(agent.agentName, values);
+    }
+  }
+
+  return Object.fromEntries(
+    [...grouped.entries()].map(([agentName, values]) => [agentName, Math.round(average(values))]),
+  );
 }
 
 function parsePositiveInt(value: string | undefined, optionName: string): number {

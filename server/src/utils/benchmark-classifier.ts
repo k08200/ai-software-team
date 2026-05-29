@@ -13,6 +13,8 @@ export type BenchmarkFailureCategory =
   | "missing-source-files"
   | "syntax-error"
   | "timeout"
+  | "ollama-unavailable"
+  | "pipeline-error"
   | "unknown";
 
 export interface BenchmarkFailure {
@@ -66,6 +68,17 @@ export function summarizeFailureCategories(
     summary[failure.category] = (summary[failure.category] ?? 0) + 1;
   }
   return summary;
+}
+
+export function classifyPipelineError(error: string | undefined): BenchmarkFailure | null {
+  if (!error) return null;
+
+  return {
+    project: "Pipeline",
+    command: "pipeline",
+    category: classifyPipelineErrorMessage(error),
+    summary: error.slice(0, 260),
+  };
 }
 
 function classifyCommandFailure(
@@ -150,6 +163,18 @@ function classifyFailedCommand(
   if (command === "npm run build") return "build-failed";
   if (command === "npm test") return "test-failed";
   return "unknown";
+}
+
+function classifyPipelineErrorMessage(error: string): BenchmarkFailureCategory {
+  const searchable = error.toLowerCase();
+  if (
+    searchable.includes("ollama") &&
+    (searchable.includes("fetch failed") || searchable.includes("couldn't connect"))
+  ) {
+    return "ollama-unavailable";
+  }
+  if (searchable.includes("timed out") || searchable.includes("timeout")) return "timeout";
+  return "pipeline-error";
 }
 
 function summarizeCommand(command: VerificationCommand): string {

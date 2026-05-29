@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyPipelineError,
   classifyVerificationFailures,
   summarizeFailureCategories,
 } from "../../src/utils/benchmark-classifier.js";
@@ -149,5 +150,11 @@ describe("benchmark classifier", () => {
     expect(failure.category).toBe("syntax-error");
     expect(failure.summary).toContain("Syntax error");
     expect(failure.summary).not.toContain("Socket.readFromStdout");
+  });
+
+  it("classifies Ollama connection errors as infrastructure failures", () => {
+    expect(
+      classifyPipelineError("[Fast MVP Planner] Ollama error: fetch failed")?.category,
+    ).toBe("ollama-unavailable");
   });
 });
